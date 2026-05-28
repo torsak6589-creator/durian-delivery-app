@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -143,6 +144,57 @@ function App() {
       (e.sum?.hand||0).toFixed(2),(e.sum?.total||0).toFixed(2),e.notes||""]);
     navigator.clipboard.writeText([h,...rows].map(r=>r.join(",")).join("\n"));
     flash2("ok","คัดลอก CSV แล้ว");
+  }
+
+  function exportExcel() {
+    const hd = [
+      "ทะเบียนรถ","วันที่ซื้อ","วันที่ถึงโรงงาน",
+      "น้ำหนักรวม (กก.)","ราคาเฉลี่ย (฿/กก.)","ค่าวัตถุดิบ (฿)",
+      "ค่ารถ (฿)","ค่าดำเนินการ (฿/กก.)","ค่าดำเนินการรวม (฿)",
+      "ยอดที่ต้องจ่าย (฿)","ต้นทุน/กก. (฿)","หมายเหตุ",
+      ...GRADES.flatMap(g=>[`${g.label} น้ำหนัก(กก)`,`${g.label} ราคา(฿/กก)`,`${g.label} มูลค่า(฿)`])
+    ];
+    const rows = entries.map(e=>[
+      e.licensePlate, e.purchaseDate, e.arrivalDate,
+      e.sum?.tw||0, e.sum?.avg||0, e.sum?.tv||0,
+      e.sum?.car||0, e.sum?.hand||0, e.sum?.handTotal||0,
+      e.sum?.totalPay||0, e.sum?.total||0, e.notes||"",
+      ...GRADES.flatMap(g=>{ const r=(e.sum?.rows||[]).find(x=>x.id===g.id); return [r?.weight||0, r?.price||0, r?.value||0]; })
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([hd,...rows]);
+    // Column widths
+    ws["!cols"] = [
+      {wch:14},{wch:12},{wch:14},
+      {wch:16},{wch:16},{wch:16},
+      {wch:12},{wch:18},{wch:18},
+      {wch:20},{wch:16},{wch:18},
+      ...GRADES.flatMap(()=>[{wch:16},{wch:14},{wch:14}])
+    ];
+    // Style header row (bold gold background) - basic
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for(let C=range.s.c; C<=range.e.c; C++){
+      const addr = XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr]) continue;
+      ws[addr].s = { font:{bold:true}, fill:{fgColor:{rgb:"C8982A"}}, alignment:{horizontal:"center"} };
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "การจัดส่งทุเรียน");
+    // Summary sheet
+    const sumRows = [
+      ["สรุปภาพรวม",""],
+      ["จำนวนรถทั้งหมด", entries.length+" คัน"],
+      ["น้ำหนักรวมทั้งหมด", aW.toFixed(2)+" กก."],
+      ["มูลค่าวัตถุดิบรวม", aV.toFixed(2)+" ฿"],
+      ["ราคาเฉลี่ยรวม", aA.toFixed(2)+" ฿/กก."],
+      ["ยอดที่โรงงานต้องจ่ายรวม", entries.reduce((s,e)=>s+(e.sum?.totalPay||0),0).toFixed(2)+" ฿"],
+      ["วันที่ส่งออก", new Date().toLocaleDateString("th-TH")],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(sumRows);
+    ws2["!cols"] = [{wch:28},{wch:22}];
+    XLSX.utils.book_append_sheet(wb, ws2, "สรุปภาพรวม");
+    const fname = `ทุเรียน-FF-${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    flash2("ok","ส่งออก Excel สำเร็จ — "+fname);
   }
 
   const aW = entries.reduce((s,e)=>s+(e.sum?.tw||0),0);
@@ -368,9 +420,15 @@ function App() {
                   ))}
                 </div>
 
-                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
+                  <button onClick={exportExcel} style={{
+                    background:"#1a6b35",border:"1px solid #2d9e52",borderRadius:7,
+                    color:"#d1fae5",padding:"8px 18px",fontSize:13,fontWeight:600,
+                    display:"flex",alignItems:"center",gap:7}}>
+                    <i className="ti ti-file-spreadsheet" style={{fontSize:16}} /> ส่งออก Excel
+                  </button>
                   <button onClick={csv} style={{background:"none",border:`1px solid ${GOLD}60`,borderRadius:7,
-                    color:GOLD,padding:"7px 16px",fontSize:12,display:"flex",alignItems:"center",gap:6}}>
+                    color:GOLD,padding:"8px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6}}>
                     <i className="ti ti-copy" style={{fontSize:14}} /> คัดลอก CSV
                   </button>
                 </div>
