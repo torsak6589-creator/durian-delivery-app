@@ -451,8 +451,21 @@ function App() {
                       </div>
                       <div style={{display:"flex",gap:16,textAlign:"right",flexShrink:0,alignItems:"stretch"}}>
                         <div>
-                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>น้ำหนักรวม</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13}}>{f2(entry.sum?.tw||0)} กก.</div>
+                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>น้ำหนักรวม</div>
+                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,marginBottom:6}}>{f2(entry.sum?.tw||0)} กก.</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}>
+                            {(entry.sum?.rows||[]).filter(r=>r.weight>0).map(r=>(
+                              <div key={r.id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,whiteSpace:"nowrap"}}>
+                                <span style={{background:`${GOLD}20`,border:`1px solid ${GOLD}40`,borderRadius:3,
+                                  padding:"1px 6px",fontWeight:600,color:GOLD_L,fontSize:10}}>{r.label}</span>
+                                <span style={{fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500}}>{f2(r.weight,0)}</span>
+                                <span style={{color:"var(--muted)"}}>กก.</span>
+                                <span style={{color:"var(--muted)"}}>×</span>
+                                <span style={{fontFamily:"var(--mono)",color:GOLD,fontWeight:600}}>{f2(r.price,0)}</span>
+                                <span style={{color:"var(--muted)",fontSize:10}}>฿</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div>
                           <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>ราคาเฉลี่ย</div>
