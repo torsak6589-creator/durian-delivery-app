@@ -80,8 +80,10 @@ function calc(form) {
   const avg   = tw>0 ? tv/tw : 0;
   const car   = parseFloat(form.carCost)||0;
   const hand  = parseFloat(form.handling)||0;
-  const carKg = tw>0 ? car/tw : 0;
-  return { tw, tv, avg, car, hand, carKg, total: avg+carKg+hand, rows };
+  const carKg    = tw>0 ? car/tw : 0;
+  const handTotal = hand * tw;
+  const totalPay  = tv + car + handTotal;
+  return { tw, tv, avg, car, hand, carKg, handTotal, totalPay, total: avg+carKg+hand, rows };
 }
 
 const f2 = (n,d=2) => (typeof n==="number"?n:0).toLocaleString("th-TH",{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -306,6 +308,33 @@ function App() {
               </div>
             )}
 
+            {/* ยอดที่โรงงานต้องจ่าย */}
+            {s.tw>0&&(
+              <div style={{background:"#0D1B2E",border:`2px solid ${GOLD}`,borderRadius:12,padding:"18px 22px",marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
+                  <i className="ti ti-calculator" style={{fontSize:14}} /> สรุปยอดที่โรงงานต้องจ่าย
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"6px 16px",fontSize:13,alignItems:"center"}}>
+                  <span style={{color:"#aac4e0"}}>ค่าวัตถุดิบ (RM)</span>
+                  <span style={{fontFamily:"var(--mono)",fontWeight:600,color:"#e8ecf1",textAlign:"right"}}>{f2(s.tv)} ฿</span>
+
+                  <span style={{color:"#aac4e0"}}>ค่ารถ</span>
+                  <span style={{fontFamily:"var(--mono)",fontWeight:600,color:"#e8ecf1",textAlign:"right"}}>+ {f2(s.car)} ฿</span>
+
+                  <span style={{color:"#aac4e0"}}>ค่าดำเนินการ ({f2(s.hand,2)} ฿/กก. × {f2(s.tw)} กก.)</span>
+                  <span style={{fontFamily:"var(--mono)",fontWeight:600,color:"#e8ecf1",textAlign:"right"}}>+ {f2(s.handTotal)} ฿</span>
+
+                  <div style={{gridColumn:"1/-1",borderTop:`1px dashed ${GOLD}50`,margin:"8px 0"}} />
+
+                  <span style={{fontWeight:700,color:GOLD,fontSize:15}}>ยอดที่โรงงานต้องจ่าย</span>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"var(--mono)",fontWeight:700,color:GOLD,fontSize:20}}>{f2(s.totalPay)} ฿</div>
+                    <div style={{fontFamily:"var(--mono)",fontWeight:600,color:GOLD_L,fontSize:13,marginTop:2}}>{f2(s.total)} ฿/กก.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button onClick={save} style={{background:GOLD,color:"#0D1B2E",border:"none",borderRadius:10,
               padding:"13px 32px",fontSize:15,fontWeight:700,width:"100%",
               display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
@@ -415,6 +444,26 @@ function App() {
                           <span>ค่าดำเนินการ: <strong style={{color:"var(--text)",fontFamily:"var(--mono)"}}>{f2(entry.sum?.hand||0)} ฿/กก.</strong></span>
                           <span>ค่ารถ/กก.: <strong style={{color:"var(--text)",fontFamily:"var(--mono)"}}>{f2(entry.sum?.carKg||0)} ฿</strong></span>
                           <span>ต้นทุน/กก.: <strong style={{color:GOLD,fontFamily:"var(--mono)"}}>{f2(entry.sum?.total||0)} ฿</strong></span>
+                        </div>
+                        {/* ยอดที่โรงงานต้องจ่าย — history */}
+                        <div style={{marginTop:12,background:"#0D1B2E",border:`1.5px solid ${GOLD}`,borderRadius:10,padding:"14px 18px"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
+                            <i className="ti ti-calculator" style={{fontSize:12}} /> ยอดที่โรงงานต้องจ่าย
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"5px 14px",fontSize:12,alignItems:"center"}}>
+                            <span style={{color:"#aac4e0"}}>ค่าวัตถุดิบ (RM)</span>
+                            <span style={{fontFamily:"var(--mono)",color:"#e8ecf1",textAlign:"right"}}>{f2(entry.sum?.tv||0)} ฿</span>
+                            <span style={{color:"#aac4e0"}}>ค่ารถ</span>
+                            <span style={{fontFamily:"var(--mono)",color:"#e8ecf1",textAlign:"right"}}>+ {f2(entry.sum?.car||0)} ฿</span>
+                            <span style={{color:"#aac4e0"}}>ค่าดำเนินการ ({f2(entry.sum?.hand||0,2)} × {f2(entry.sum?.tw||0)} กก.)</span>
+                            <span style={{fontFamily:"var(--mono)",color:"#e8ecf1",textAlign:"right"}}>+ {f2(entry.sum?.handTotal||0)} ฿</span>
+                            <div style={{gridColumn:"1/-1",borderTop:`1px dashed ${GOLD}50`,margin:"6px 0"}} />
+                            <span style={{fontWeight:700,color:GOLD,fontSize:13}}>ยอดรวม</span>
+                            <div style={{textAlign:"right"}}>
+                              <span style={{fontFamily:"var(--mono)",fontWeight:700,color:GOLD,fontSize:15}}>{f2(entry.sum?.totalPay||0)} ฿</span>
+                              <span style={{fontFamily:"var(--mono)",color:GOLD_L,fontSize:12,marginLeft:10}}>{f2(entry.sum?.total||0)} ฿/กก.</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
