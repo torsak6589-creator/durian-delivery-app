@@ -438,50 +438,72 @@ function App() {
                     borderColor:exp===entry.id?`${GOLD}80`:"var(--border)"}}
                     onClick={()=>setExp(exp===entry.id?null:entry.id)}>
 
-                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                      {/* ทะเบียน */}
                       <div style={{background:`${GOLD}18`,border:`1px solid ${GOLD}60`,borderRadius:7,
                         padding:"5px 14px",fontSize:14,fontWeight:700,color:GOLD,
-                        fontFamily:"var(--mono)",minWidth:100,textAlign:"center",flexShrink:0}}>
+                        fontFamily:"var(--mono)",minWidth:100,textAlign:"center",flexShrink:0,alignSelf:"center"}}>
                         {entry.licensePlate||"—"}
                       </div>
-                      <div style={{flex:1,display:"flex",gap:16,flexWrap:"wrap"}}>
+
+                      {/* วันที่ */}
+                      <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0,alignSelf:"center",minWidth:110}}>
                         <span style={{fontSize:12,color:"var(--muted)"}}>ซื้อ <strong style={{color:"var(--text)",fontWeight:600}}>{fd(entry.purchaseDate)}</strong></span>
                         <span style={{fontSize:12,color:"var(--muted)"}}>ถึง <strong style={{color:"var(--text)",fontWeight:600}}>{fd(entry.arrivalDate)}</strong></span>
                         {entry.notes&&<span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic"}}>{entry.notes}</span>}
                       </div>
-                      <div style={{display:"flex",gap:16,textAlign:"right",flexShrink:0,alignItems:"stretch"}}>
-                        <div>
-                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>น้ำหนักรวม</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,marginBottom:6}}>{f2(entry.sum?.tw||0)} กก.</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}>
+
+                      {/* เบอร์ทุเรียน breakdown */}
+                      <div style={{flex:1,minWidth:200}}>
+                        <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6,fontWeight:600}}>รายละเอียดเบอร์</div>
+                        <table style={{fontSize:12,borderCollapse:"collapse",width:"100%"}}>
+                          <thead>
+                            <tr style={{borderBottom:`1px solid ${GOLD}30`}}>
+                              <th style={{padding:"3px 8px",textAlign:"left",color:GOLD,fontWeight:600,fontSize:10,textTransform:"uppercase"}}>เบอร์</th>
+                              <th style={{padding:"3px 8px",textAlign:"right",color:GOLD,fontWeight:600,fontSize:10,textTransform:"uppercase"}}>น้ำหนัก</th>
+                              <th style={{padding:"3px 8px",textAlign:"right",color:GOLD,fontWeight:600,fontSize:10,textTransform:"uppercase"}}>ราคา/กก.</th>
+                              <th style={{padding:"3px 8px",textAlign:"right",color:GOLD,fontWeight:600,fontSize:10,textTransform:"uppercase"}}>มูลค่า</th>
+                            </tr>
+                          </thead>
+                          <tbody>
                             {(entry.sum?.rows||[]).filter(r=>r.weight>0).map(r=>(
-                              <div key={r.id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,whiteSpace:"nowrap"}}>
-                                <span style={{background:`${GOLD}20`,border:`1px solid ${GOLD}40`,borderRadius:3,
-                                  padding:"1px 6px",fontWeight:600,color:GOLD_L,fontSize:10}}>{r.label}</span>
-                                <span style={{fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500}}>{f2(r.weight,0)}</span>
-                                <span style={{color:"var(--muted)"}}>กก.</span>
-                                <span style={{color:"var(--muted)"}}>×</span>
-                                <span style={{fontFamily:"var(--mono)",color:GOLD,fontWeight:600}}>{f2(r.price,0)}</span>
-                                <span style={{color:"var(--muted)",fontSize:10}}>฿</span>
-                              </div>
+                              <tr key={r.id} style={{borderBottom:"1px solid var(--border)"}}>
+                                <td style={{padding:"4px 8px"}}>
+                                  <span style={{background:`${GOLD}20`,border:`1px solid ${GOLD}40`,borderRadius:3,
+                                    padding:"1px 7px",fontWeight:600,color:GOLD_L,fontSize:11}}>{r.label}</span>
+                                </td>
+                                <td style={{padding:"4px 8px",textAlign:"right",fontFamily:"var(--mono)",fontWeight:500,fontSize:12}}>{f2(r.weight,0)} กก.</td>
+                                <td style={{padding:"4px 8px",textAlign:"right",fontFamily:"var(--mono)",fontWeight:600,color:GOLD,fontSize:12}}>{f2(r.price,2)} ฿</td>
+                                <td style={{padding:"4px 8px",textAlign:"right",fontFamily:"var(--mono)",fontSize:12,color:"var(--success)"}}>{f2(r.value,0)} ฿</td>
+                              </tr>
                             ))}
-                          </div>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* KPI block */}
+                      <div style={{display:"flex",gap:14,textAlign:"right",flexShrink:0,alignItems:"stretch",flexWrap:"wrap"}}>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>น้ำหนักรวม</div>
+                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:14}}>{f2(entry.sum?.tw||0)} กก.</div>
                         </div>
-                        <div>
-                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>ราคาเฉลี่ย</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:GOLD}}>{f2(entry.sum?.avg||0)} ฿/กก.</div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>ราคาเฉลี่ย</div>
+                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:14,color:GOLD}}>{f2(entry.sum?.avg||0)} ฿/กก.</div>
                         </div>
-                        <div>
-                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>ต้นทุน/กก.</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:"var(--success)"}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>ต้นทุน/กก.</div>
+                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:14,color:"var(--success)"}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
                         </div>
-                        <div style={{borderLeft:"1px solid var(--border)",paddingLeft:16,background:"#0D1B2E",borderRadius:8,padding:"6px 14px",textAlign:"center"}}>
-                          <div style={{fontSize:10,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>ยอดที่ต้องจ่าย</div>
-                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:15,color:GOLD}}>{f2(entry.sum?.totalPay||0)} ฿</div>
-                          <div style={{fontFamily:"var(--mono)",fontSize:11,color:GOLD_L,marginTop:1}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
+                        <div style={{background:"#0D1B2E",borderRadius:8,padding:"8px 16px",textAlign:"center",alignSelf:"center"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>ยอดที่ต้องจ่าย</div>
+                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:16,color:GOLD}}>{f2(entry.sum?.totalPay||0)} ฿</div>
+                          <div style={{fontFamily:"var(--mono)",fontSize:11,color:GOLD_L,marginTop:2}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
                         </div>
                       </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+
+                      {/* Actions */}
+                      <div style={{display:"flex",alignItems:"center",gap:8,alignSelf:"center",flexShrink:0}}>
                         <i className={`ti ${exp===entry.id?"ti-chevron-up":"ti-chevron-down"}`} style={{fontSize:16,color:"var(--muted)"}} />
                         <button onClick={ev=>{ev.stopPropagation();del(entry.id);}} style={{
                           background:"none",border:"1px solid var(--danger)",color:"var(--danger)",
