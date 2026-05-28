@@ -391,18 +391,23 @@ function App() {
                         <span style={{fontSize:12,color:"var(--muted)"}}>ถึง <strong style={{color:"var(--text)",fontWeight:600}}>{fd(entry.arrivalDate)}</strong></span>
                         {entry.notes&&<span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic"}}>{entry.notes}</span>}
                       </div>
-                      <div style={{display:"flex",gap:20,textAlign:"right",flexShrink:0}}>
+                      <div style={{display:"flex",gap:16,textAlign:"right",flexShrink:0,alignItems:"stretch"}}>
                         <div>
                           <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>น้ำหนักรวม</div>
                           <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13}}>{f2(entry.sum?.tw||0)} กก.</div>
                         </div>
                         <div>
                           <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>ราคาเฉลี่ย</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:GOLD}}>{f2(entry.sum?.avg||0)} ฿</div>
+                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:GOLD}}>{f2(entry.sum?.avg||0)} ฿/กก.</div>
                         </div>
                         <div>
                           <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em"}}>ต้นทุน/กก.</div>
-                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:"var(--success)"}}>{f2(entry.sum?.total||0)} ฿</div>
+                          <div style={{fontWeight:600,fontFamily:"var(--mono)",fontSize:13,color:"var(--success)"}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
+                        </div>
+                        <div style={{borderLeft:"1px solid var(--border)",paddingLeft:16,background:"#0D1B2E",borderRadius:8,padding:"6px 14px",textAlign:"center"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>ยอดที่ต้องจ่าย</div>
+                          <div style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:15,color:GOLD}}>{f2(entry.sum?.totalPay||0)} ฿</div>
+                          <div style={{fontFamily:"var(--mono)",fontSize:11,color:GOLD_L,marginTop:1}}>{f2(entry.sum?.total||0)} ฿/กก.</div>
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
