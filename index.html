@@ -105,6 +105,8 @@ function App() {
   const [errs,      setErrs]      = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editForm,  setEditForm]  = useState(null);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo,   setFilterTo]   = useState("");
 
   useEffect(() => {
     try { const r=localStorage.getItem(KEY); if(r) setEntries(JSON.parse(r)); } catch{}
@@ -169,7 +171,7 @@ function App() {
 
   function csv() {
     const h=["ทะเบียนรถ","วันที่ซื้อ","วันที่ถึงโรงงาน","น้ำหนัก(กก)","ราคาเฉลี่ย","ค่ารถ","ค่าดำเนินการ","ต้นทุน/กก","หมายเหตุ"];
-    const rows=entries.map(e=>[e.licensePlate,e.purchaseDate,e.arrivalDate,
+    const rows=filteredEntries.map(e=>[e.licensePlate,e.purchaseDate,e.arrivalDate,
       (e.sum?.tw||0).toFixed(2),(e.sum?.avg||0).toFixed(2),(e.sum?.car||0).toFixed(2),
       (e.sum?.hand||0).toFixed(2),(e.sum?.total||0).toFixed(2),e.notes||""]);
     navigator.clipboard.writeText([h,...rows].map(r=>r.join(",")).join("\n"));
@@ -184,7 +186,7 @@ function App() {
       "ยอดที่ต้องจ่าย (฿)","ต้นทุน/กก. (฿)","หมายเหตุ",
       ...GRADES.flatMap(g=>[`${g.label} น้ำหนัก(กก)`,`${g.label} ราคา(฿/กก)`,`${g.label} มูลค่า(฿)`])
     ];
-    const rows = entries.map(e=>[
+    const rows = filteredEntries.map(e=>[
       e.licensePlate, e.purchaseDate, e.arrivalDate,
       e.sum?.tw||0, e.sum?.avg||0, e.sum?.tv||0,
       e.sum?.car||0, e.sum?.hand||0, e.sum?.handTotal||0,
@@ -209,20 +211,21 @@ function App() {
     }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "การจัดส่งทุเรียน");
-    // Summary sheet
     const sumRows = [
       ["สรุปภาพรวม",""],
-      ["จำนวนรถทั้งหมด", entries.length+" คัน"],
-      ["น้ำหนักรวมทั้งหมด", aW.toFixed(2)+" กก."],
-      ["มูลค่าวัตถุดิบรวม", aV.toFixed(2)+" ฿"],
-      ["ราคาเฉลี่ยรวม", aA.toFixed(2)+" ฿/กก."],
-      ["ยอดที่โรงงานต้องจ่ายรวม", entries.reduce((s,e)=>s+(e.sum?.totalPay||0),0).toFixed(2)+" ฿"],
+      ["ช่วงวันที่", isFiltered ? `${filterFrom||"ทั้งหมด"} ถึง ${filterTo||"ทั้งหมด"}` : "ทั้งหมด"],
+      ["จำนวนรถ", filteredEntries.length+(isFiltered?"/"+entries.length:"")+" คัน"],
+      ["น้ำหนักรวม", fW.toFixed(2)+" กก."],
+      ["มูลค่าวัตถุดิบรวม", fV.toFixed(2)+" ฿"],
+      ["ราคาเฉลี่ยรวม", fA.toFixed(2)+" ฿/กก."],
+      ["ยอดที่โรงงานต้องจ่ายรวม", fPay.toFixed(2)+" ฿"],
       ["วันที่ส่งออก", new Date().toLocaleDateString("th-TH")],
     ];
     const ws2 = XLSX.utils.aoa_to_sheet(sumRows);
     ws2["!cols"] = [{wch:28},{wch:22}];
     XLSX.utils.book_append_sheet(wb, ws2, "สรุปภาพรวม");
-    const fname = `ทุเรียน-FF-${new Date().toISOString().slice(0,10)}.xlsx`;
+    const filterLabel = isFiltered ? `-${filterFrom||""}ถึง${filterTo||-""}` : "";
+    const fname = `ทุเรียน-FF${filterLabel}-${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, fname);
     flash2("ok","ส่งออก Excel สำเร็จ — "+fname);
   }
@@ -230,6 +233,18 @@ function App() {
   const aW = entries.reduce((s,e)=>s+(e.sum?.tw||0),0);
   const aV = entries.reduce((s,e)=>s+(e.sum?.tv||0),0);
   const aA = aW>0 ? aV/aW : 0;
+
+  // Filtered entries for history tab
+  const filteredEntries = entries.filter(e=>{
+    if(filterFrom && e.purchaseDate < filterFrom) return false;
+    if(filterTo   && e.purchaseDate > filterTo)   return false;
+    return true;
+  });
+  const fW  = filteredEntries.reduce((s,e)=>s+(e.sum?.tw||0),0);
+  const fV  = filteredEntries.reduce((s,e)=>s+(e.sum?.tv||0),0);
+  const fA  = fW>0 ? fV/fW : 0;
+  const fPay = filteredEntries.reduce((s,e)=>s+(e.sum?.totalPay||0),0);
+  const isFiltered = filterFrom||filterTo;
 
   return (
     <div style={{fontFamily:"var(--font)", paddingBottom:48}}>
@@ -428,19 +443,63 @@ function App() {
         {/* ═══ HISTORY ═══ */}
         {tab==="history"&&(
           <div>
+            {/* ── Filter Bar ── */}
+            <div style={{...S.card, marginBottom:16, padding:"16px 20px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+                <i className="ti ti-filter" style={{fontSize:13}} /> กรองข้อมูลตามวันที่ซื้อ
+              </div>
+              <div style={{display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:140}}>
+                  <label style={S.lbl}>ตั้งแต่วันที่</label>
+                  <input type="date" style={S.inp} value={filterFrom}
+                    onChange={e=>{ setFilterFrom(e.target.value); setExp(null); }} />
+                </div>
+                <div style={{flex:1,minWidth:140}}>
+                  <label style={S.lbl}>ถึงวันที่</label>
+                  <input type="date" style={S.inp} value={filterTo}
+                    onChange={e=>{ setFilterTo(e.target.value); setExp(null); }} />
+                </div>
+                <div style={{display:"flex",gap:8,paddingBottom:1}}>
+                  <button onClick={()=>{ setFilterFrom(""); setFilterTo(""); setExp(null); }} style={{
+                    background:"none",border:"1px solid var(--border2)",color:"var(--muted)",
+                    borderRadius:7,padding:"7px 16px",fontSize:13,fontFamily:"var(--font)",
+                    display:"flex",alignItems:"center",gap:5,
+                    opacity: isFiltered ? 1 : 0.4, cursor: isFiltered ? "pointer" : "default"}}>
+                    <i className="ti ti-x" style={{fontSize:13}} /> ล้าง
+                  </button>
+                </div>
+              </div>
+              {isFiltered&&(
+                <div style={{marginTop:10,fontSize:12,color:"var(--muted)",display:"flex",alignItems:"center",gap:6}}>
+                  <i className="ti ti-info-circle" style={{color:GOLD}} />
+                  แสดง <strong style={{color:GOLD}}>{filteredEntries.length}</strong> รายการ
+                  {filterFrom&&<> ตั้งแต่ <strong style={{color:"var(--text)"}}>{fd(filterFrom)}</strong></>}
+                  {filterTo&&<> ถึง <strong style={{color:"var(--text)"}}>{fd(filterTo)}</strong></>}
+                  {" "}(จากทั้งหมด {entries.length} รายการ)
+                </div>
+              )}
+            </div>
+
             {entries.length===0?(
               <div style={{textAlign:"center",padding:60,color:"var(--muted)"}}>
                 <i className="ti ti-package" style={{fontSize:40,color:GOLD}} />
                 <div style={{marginTop:12,fontSize:14}}>ยังไม่มีข้อมูลการจัดส่ง</div>
               </div>
+            ):filteredEntries.length===0?(
+              <div style={{textAlign:"center",padding:48,color:"var(--muted)"}}>
+                <i className="ti ti-search" style={{fontSize:36,color:GOLD}} />
+                <div style={{marginTop:12,fontSize:14}}>ไม่พบรายการในช่วงวันที่ที่เลือก</div>
+                <div style={{fontSize:12,marginTop:6}}>ลองเปลี่ยนช่วงวันที่หรือกดปุ่ม "ล้าง"</div>
+              </div>
             ):(
               <>
+                {/* KPI cards — ใช้ข้อมูล filtered */}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,marginBottom:18}}>
                   {[
-                    {lb:"จำนวนรถ",      v:entries.length+" คัน",  ic:"ti-truck"},
-                    {lb:"น้ำหนักรวม",   v:f2(aW,0)+" กก.",         ic:"ti-weight"},
-                    {lb:"มูลค่า RM รวม",v:f2(aV,0)+" ฿",           ic:"ti-cash"},
-                    {lb:"ราคาเฉลี่ย",  v:f2(aA)+" ฿/กก.",          ic:"ti-chart-line"},
+                    {lb:"จำนวนรถ",       v:filteredEntries.length+(isFiltered?"/"+entries.length:"")+" คัน", ic:"ti-truck"},
+                    {lb:"น้ำหนักรวม",    v:f2(fW,0)+" กก.",   ic:"ti-weight"},
+                    {lb:"มูลค่า RM รวม", v:f2(fV,0)+" ฿",     ic:"ti-cash"},
+                    {lb:"ราคาเฉลี่ย",   v:f2(fA)+" ฿/กก.",   ic:"ti-chart-line"},
                   ].map(c=>(
                     <div key={c.lb} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px",textAlign:"center"}}>
                       <i className={`ti ${c.ic}`} style={{fontSize:18,color:GOLD}} />
@@ -450,12 +509,23 @@ function App() {
                   ))}
                 </div>
 
+                {/* ยอดรวมที่ต้องจ่าย (filtered) */}
+                <div style={{background:"#0D1B2E",border:`1px solid ${GOLD}50`,borderRadius:10,
+                  padding:"12px 20px",marginBottom:16,display:"flex",gap:28,flexWrap:"wrap",alignItems:"center"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:GOLD,textTransform:"uppercase",letterSpacing:"0.07em",flexShrink:0}}>
+                    <i className="ti ti-calculator" style={{fontSize:13,marginRight:4}} />
+                    ยอดที่ต้องจ่ายรวม{isFiltered?" (ที่กรอง)":""}
+                  </div>
+                  <div style={{fontFamily:"var(--mono)",fontWeight:700,color:GOLD,fontSize:20}}>{f2(fPay)} ฿</div>
+                  <div style={{fontSize:12,color:"#8899bb",fontFamily:"var(--mono)"}}>{fW>0?f2(fPay/fW,2)+" ฿/กก.":""}</div>
+                </div>
+
                 <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
                   <button onClick={exportExcel} style={{
                     background:"#1a6b35",border:"1px solid #2d9e52",borderRadius:7,
                     color:"#d1fae5",padding:"8px 18px",fontSize:13,fontWeight:600,
                     display:"flex",alignItems:"center",gap:7}}>
-                    <i className="ti ti-file-spreadsheet" style={{fontSize:16}} /> ส่งออก Excel
+                    <i className="ti ti-file-spreadsheet" style={{fontSize:16}} /> ส่งออก Excel{isFiltered?" (ที่กรอง)":""}
                   </button>
                   <button onClick={csv} style={{background:"none",border:`1px solid ${GOLD}60`,borderRadius:7,
                     color:GOLD,padding:"8px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6}}>
@@ -463,7 +533,7 @@ function App() {
                   </button>
                 </div>
 
-                {entries.map(entry=>{
+                {filteredEntries.map(entry=>{
                   const isEditing = editingId===entry.id;
                   const es = isEditing ? calc(editForm) : null;
                   return (
