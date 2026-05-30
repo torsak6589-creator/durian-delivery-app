@@ -47,7 +47,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const GRADES = [
   { id:"abc",     label:"ABC" },
@@ -107,6 +107,8 @@ function App() {
   const [editForm,  setEditForm]  = useState(null);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo,   setFilterTo]   = useState("");
+  const [importResult, setImportResult] = useState(null);
+  const importRef = useRef(null);
 
   useEffect(() => {
     try { const r=localStorage.getItem(KEY); if(r) setEntries(JSON.parse(r)); } catch{}
@@ -228,6 +230,78 @@ function App() {
     const fname = `ทุเรียน-FF${filterLabel}-${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, fname);
     flash2("ok","ส่งออก Excel สำเร็จ — "+fname);
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, {type:"array"});
+        const ws = wb.Sheets["การจัดส่งทุเรียน"];
+        if(!ws){ flash2("err","ไม่พบ sheet 'การจัดส่งทุเรียน' ในไฟล์นี้"); return; }
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+        if(rows.length < 2){ flash2("err","ไม่พบข้อมูลในไฟล์"); return; }
+
+        // rows[0] = header, rows[1..] = data
+        // Col map: 0=plate,1=buyDate,2=arrDate,3=tw,4=avg,5=tv,6=car,7=hand,8=handTotal,9=totalPay,10=total,11=notes
+        // then grades: 12+i*3 = weight, 12+i*3+1 = price, 12+i*3+2 = value (i=0..6)
+        let added=0, skipped=0, dupes=0;
+        const newEntries = [...entries];
+        const existingKeys = new Set(entries.map(e=>`${e.licensePlate}|${e.purchaseDate}`));
+
+        rows.slice(1).forEach((r,idx) => {
+          const plate = String(r[0]||"").trim();
+          const buyDate = String(r[1]||"").trim();
+          if(!plate || !buyDate) { skipped++; return; }
+
+          // Skip duplicate
+          const key = `${plate}|${buyDate}`;
+          if(existingKeys.has(key)){ dupes++; return; }
+
+          // Reconstruct grades
+          const grades = {};
+          GRADES.forEach((g,i) => {
+            const w = parseFloat(r[12+i*3]) || 0;
+            const p = parseFloat(r[12+i*3+1]) || 0;
+            grades[g.id] = { weight: w>0?String(w):"", price: p>0?String(p):"" };
+          });
+
+          const formObj = {
+            purchaseDate: buyDate,
+            arrivalDate:  String(r[2]||buyDate).trim(),
+            licensePlate: plate,
+            grades,
+            carCost:  String(parseFloat(r[6])||""),
+            handling: String(parseFloat(r[7])||""),
+            notes:    String(r[11]||""),
+          };
+
+          const entry = {
+            id: Date.now() + idx + Math.random(),
+            ...formObj,
+            sum: calc(formObj),
+            savedAt: new Date().toISOString(),
+            importedFrom: file.name,
+          };
+          newEntries.push(entry);
+          existingKeys.add(key);
+          added++;
+        });
+
+        // Sort by purchaseDate desc
+        newEntries.sort((a,b)=> b.purchaseDate.localeCompare(a.purchaseDate));
+        setEntries(newEntries);
+        try{ localStorage.setItem(KEY, JSON.stringify(newEntries)); }catch{}
+        setImportResult({added, dupes, skipped, file:file.name});
+        setTimeout(()=>setImportResult(null), 6000);
+      } catch(err) {
+        flash2("err","อ่านไฟล์ไม่สำเร็จ: "+err.message);
+      }
+      e.target.value = "";
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   const aW = entries.reduce((s,e)=>s+(e.sum?.tw||0),0);
@@ -524,18 +598,48 @@ function App() {
                   <div style={{fontSize:12,color:"#8899bb",fontFamily:"var(--mono)"}}>{fW>0?f2(fPay/fW,2)+" ฿/กก.":""}</div>
                 </div>
 
-                <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                  {/* Hidden file input */}
+                  <input ref={importRef} type="file" accept=".xlsx"
+                    style={{display:"none"}} onChange={handleImportFile} />
+
+                  <button onClick={()=>importRef.current.click()} style={{
+                    background:"none",border:`1px solid ${GOLD}`,borderRadius:7,
+                    color:GOLD,padding:"8px 18px",fontSize:13,fontWeight:600,
+                    display:"flex",alignItems:"center",gap:7,fontFamily:"var(--font)"}}>
+                    <i className="ti ti-file-import" style={{fontSize:16}} /> นำเข้า Excel
+                  </button>
                   <button onClick={exportExcel} style={{
                     background:"#1a6b35",border:"1px solid #2d9e52",borderRadius:7,
                     color:"#d1fae5",padding:"8px 18px",fontSize:13,fontWeight:600,
-                    display:"flex",alignItems:"center",gap:7}}>
+                    display:"flex",alignItems:"center",gap:7,fontFamily:"var(--font)"}}>
                     <i className="ti ti-file-spreadsheet" style={{fontSize:16}} /> ส่งออก Excel{isFiltered?" (ที่กรอง)":""}
                   </button>
                   <button onClick={csv} style={{background:"none",border:`1px solid ${GOLD}60`,borderRadius:7,
-                    color:GOLD,padding:"8px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6}}>
+                    color:GOLD,padding:"8px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6,fontFamily:"var(--font)"}}>
                     <i className="ti ti-copy" style={{fontSize:14}} /> คัดลอก CSV
                   </button>
                 </div>
+
+                {/* Import result banner */}
+                {importResult&&(
+                  <div style={{
+                    background:"#0D1B2E",border:`1.5px solid ${GOLD}`,borderRadius:10,
+                    padding:"14px 18px",marginBottom:14,
+                    display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",
+                  }}>
+                    <i className="ti ti-check" style={{fontSize:20,color:GOLD,flexShrink:0}} />
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,color:GOLD,fontSize:14,marginBottom:4}}>นำเข้าข้อมูลสำเร็จ — {importResult.file}</div>
+                      <div style={{display:"flex",gap:18,flexWrap:"wrap",fontSize:13}}>
+                        <span style={{color:"#6ee7b7"}}>✓ เพิ่มใหม่ <strong style={{color:"#a7f3d0"}}>{importResult.added} รายการ</strong></span>
+                        {importResult.dupes>0&&<span style={{color:"#fcd34d"}}>⚠ ซ้ำ (ข้าม) <strong style={{color:"#fde68a"}}>{importResult.dupes} รายการ</strong></span>}
+                        {importResult.skipped>0&&<span style={{color:"#aac4e0"}}>— ว่าง (ข้าม) <strong>{importResult.skipped} รายการ</strong></span>}
+                      </div>
+                    </div>
+                    <button onClick={()=>setImportResult(null)} style={{background:"none",border:"none",color:"#8899bb",cursor:"pointer",fontSize:18,padding:0}}>✕</button>
+                  </div>
+                )}
 
                 {filteredEntries.map(entry=>{
                   const isEditing = editingId===entry.id;
