@@ -11,6 +11,42 @@ const S = {
   inp:  { width: "100%" },
 };
 
+/* ───── ตรวจหารายการซ้ำ (ข้อมูลเหมือนกันทุกช่อง) ─────
+   ลายเซ็น (signature) = รวมทุกฟิลด์ที่มีความหมาย หากตรงกัน = บันทึกซ้ำ */
+function entrySig(e) {
+  const g = GRADES.map(gr => {
+    const w = parseFloat(e.grades?.[gr.id]?.weight) || 0;
+    const p = parseFloat(e.grades?.[gr.id]?.price) || 0;
+    return `${gr.id}:${w}:${p}`;
+  }).join("|");
+  return [
+    (e.licensePlate || "").trim(),
+    e.purchaseDate || "", e.arrivalDate || "",
+    parseFloat(e.carCost) || 0, parseFloat(e.handling) || 0,
+    (e.notes || "").trim(), g,
+  ].join("#");
+}
+
+// คืน id ของรายการซ้ำที่ควรลบ (เก็บรายการล่าสุดของแต่ละกลุ่มไว้)
+function findDuplicateIds(list) {
+  const groups = {};
+  list.forEach(e => {
+    if (!(e.licensePlate || "").trim()) return; // ข้ามรายการที่ไม่มีทะเบียน
+    const k = entrySig(e);
+    (groups[k] = groups[k] || []).push(e);
+  });
+  const ids = [];
+  Object.values(groups).forEach(g => {
+    if (g.length > 1) {
+      g.sort((a, b) =>
+        String(b.updatedAt || b.at || "").localeCompare(String(a.updatedAt || a.at || "")) ||
+        String(b.id).localeCompare(String(a.id)));
+      g.slice(1).forEach(e => ids.push(e.id)); // เก็บตัวแรก (ล่าสุด) ลบที่เหลือ
+    }
+  });
+  return ids;
+}
+
 /* ═══ สถานะการเชื่อมต่อฐานข้อมูล ═══ */
 function StatusBadge({ status, pending, onClick }) {
   const map = {
@@ -115,6 +151,7 @@ function App() {
   const [pending,    setPending]    = useState(0);
   const [showSetup,  setShowSetup]  = useState(false);
   const [migrateCount, setMigrateCount] = useState(0);
+  const dedupingRef = useRef(false);
 
   useEffect(() => {
     setEntries(DB.getCache()); // แสดงจาก cache ทันที
@@ -125,6 +162,22 @@ function App() {
     else startDb();
     return () => { offStatus(); offChange(); };
   }, []);
+
+  // ── ลบรายการซ้ำอัตโนมัติ เมื่อข้อมูลเปลี่ยน ──
+  useEffect(() => {
+    if (dedupingRef.current) return;
+    if (findDuplicateIds(entries).length) runDedupe(true);
+  }, [entries]);
+
+  function runDedupe(auto) {
+    const ids = findDuplicateIds(entries);
+    if (!ids.length) { if (!auto) flash2("ok", "ไม่พบรายการซ้ำ"); return; }
+    dedupingRef.current = true;
+    const idSet = new Set(ids.map(String));
+    setEntries(prev => prev.filter(e => !idSet.has(String(e.id))));
+    Promise.all(ids.map(id => DB.remove(id))).finally(() => { dedupingRef.current = false; });
+    flash2("ok", `ลบรายการซ้ำ${auto ? "อัตโนมัติ" : ""} ${ids.length} รายการ (เก็บรายการล่าสุดไว้)`);
+  }
 
   function startDb() {
     const ok = DB.init();
@@ -652,6 +705,10 @@ function App() {
                   <button onClick={csv} style={{ background: "none", border: `1px solid ${GOLD}60`, borderRadius: 7,
                     color: GOLD, padding: "8px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font)" }}>
                     <i className="ti ti-copy" style={{ fontSize: 14 }} /> คัดลอก CSV
+                  </button>
+                  <button onClick={() => runDedupe(false)} style={{ background: "none", border: "1px solid var(--border2)", borderRadius: 7,
+                    color: "var(--muted)", padding: "8px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font)" }}>
+                    <i className="ti ti-copy-off" style={{ fontSize: 14 }} /> ลบรายการซ้ำ
                   </button>
                 </div>
 
