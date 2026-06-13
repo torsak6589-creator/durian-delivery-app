@@ -8,6 +8,7 @@ const GRADES = [
   { id: "sudtai",  label: "สุดท้าย" },
   { id: "boe",     label: "โบ้" },
   { id: "lek",     label: "เล็ก" },
+  { id: "rubare",  label: "รูแบร์" },
 ];
 
 const GOLD = "#C8982A";
