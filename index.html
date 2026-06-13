@@ -32,7 +32,7 @@
     --font: 'Noto Sans Thai', sans-serif;
   }
   body { background: var(--bg); font-family: var(--font); color: var(--text); min-height: 100vh; }
-  input[type=text], input[type=number], input[type=date], input[type=time] {
+  input[type=text], input[type=number], input[type=date], input[type=time], input[type=email], input[type=password] {
     background: var(--card2); border: 1px solid var(--border2);
     border-radius: 6px; color: var(--text); padding: 7px 10px;
     font-size: 14px; font-family: var(--font); outline: none;
@@ -48,10 +48,7 @@
 <body>
 <div id="root"></div>
 <script>
-/* ───────────────────────────────────────────────────────────
-   helpers.js — ค่าคงที่และฟังก์ชันคำนวณที่ใช้ร่วมกันทุกไฟล์
-   (pure JS, แนบไว้ที่ window.Helpers)
-   ─────────────────────────────────────────────────────────── */
+/* ── helpers.js ── */
 (function () {
   const GRADES = [
     { id: "abc",     label: "ABC" },
@@ -63,10 +60,8 @@
     { id: "lek",     label: "เล็ก" },
     { id: "rubare",  label: "รูแบร์" },
   ];
-
   const GOLD = "#C8982A";
   const GOLD_L = "#e8b540";
-
   const initG = () => Object.fromEntries(GRADES.map(g => [g.id, { weight: "", price: "" }]));
 
   // จุดปล่อยรถ 2 จุด → ปลายทางเดียวกัน: นาหม่อม สงขลา (XG8F+68)
@@ -75,7 +70,7 @@
     { id: "suratthani", label: "บ้านนาสาร สุราษฎร์ธานี", short: "สุราษฎร์ฯ", mins: 240, code: "Q8G8+CW" },
   ];
 
-  // คำนวณเวลาถึงประมาณการณ์ (HH:MM ท้องถิ่น) จากเวลาปล่อยรถ + เวลาเดินทาง
+  // คำนวณ ETA ถึงนาหม่อม สงขลา
   const calcETA = (releaseTime, locationId) => {
     if (!releaseTime || !locationId) return null;
     const loc = LOCATIONS.find(l => l.id === locationId);
@@ -91,16 +86,12 @@
     purchaseDate: new Date().toISOString().slice(0, 10),
     arrivalDate:  new Date().toISOString().slice(0, 10),
     licensePlate: "", grades: initG(), carCost: "", handling: "", notes: "",
-    releaseTime: "",
-    departLocation: "",
+    releaseTime: "", departLocation: "",
   });
-
-  // เวลาปัจจุบันรูปแบบ HH:MM (24 ชม., เวลาท้องถิ่น) สำหรับปุ่ม "ปล่อยตอนนี้"
   const nowHM = () => {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
-
   function calc(form) {
     let tw = 0, tv = 0;
     const rows = GRADES.map(g => {
@@ -117,56 +108,39 @@
     const totalPay  = tv + car + handTotal;
     return { tw, tv, avg, car, hand, carKg, handTotal, totalPay, total: avg + carKg + hand, rows };
   }
-
   const f2 = (n, d = 2) =>
     (typeof n === "number" ? n : 0).toLocaleString("th-TH", { minimumFractionDigits: d, maximumFractionDigits: d });
-
   const fd = s =>
     s ? new Date(s + "T00:00:00").toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "-";
-
   const newId = () =>
     (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
-
   window.Helpers = { GRADES, GOLD, GOLD_L, LOCATIONS, initG, emptyForm, calc, f2, fd, newId, nowHM, calcETA };
 })();
-
 </script>
 <script>
-/* ───────────────────────────────────────────────────────────
-   db.js — ชั้นข้อมูล (Data Layer) เชื่อม Supabase
-   • ฐานข้อมูลกลาง: ทุกคนที่เปิดลิงก์เดียวกันเห็นข้อมูลชุดเดียวกัน
-   • Realtime: เมื่อมีคนเพิ่ม/แก้/ลบ เครื่องอื่นอัปเดตทันที
-   • Offline: เน็ตหลุดก็ยังบันทึกได้ (เก็บใน localStorage แล้ว sync ทีหลัง)
-   • ไม่มีระบบล็อกอิน — ใครมีลิงก์ก็ใช้ได้
-   แนบไว้ที่ window.DurianDB
-   ─────────────────────────────────────────────────────────── */
+/* ── db.js ── */
 (function () {
-  // ===== ⚙️ ตั้งค่าตรงนี้ก่อน DEPLOY ขึ้น GitHub Pages =====
-  // เปิดโปรเจกต์ Supabase → Settings → API → คัดลอกค่ามาวาง
-  // anon key ปลอดภัยที่จะใส่ในไฟล์ (ถูกป้องกันด้วย RLS อยู่แล้ว)
   const HARDCODED = {
     url: "https://iqwsfnugjnjrpgjrqsxw.supabase.co",
     key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxd3NmbnVnam5qcnBnanJxc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODYzNzcsImV4cCI6MjA5NjA2MjM3N30.ADelXEkVyQiXeGwST8P6PnAR-QUtRqWMUhDVyiekWVU",
   };
-  // ถ้าเว้นว่างไว้ แอปจะให้กรอกค่าผ่านหน้าตั้งค่าตอนเปิดครั้งแรก (เก็บในเครื่อง)
 
   const TABLE        = "deliveries";
   const CFG_KEY      = "durian-supabase-config";
   const CACHE_KEY    = "durian-cloud-cache-v1";
   const QUEUE_KEY    = "durian-pending-ops-v1";
-  const OLD_KEY      = "durian-delivery-v2";   // ข้อมูลเดิมที่เก็บใน localStorage
+  const OLD_KEY      = "durian-delivery-v2";
   const MIGRATED_KEY = "durian-migrated-v1";
 
   let client = null;
   let channel = null;
-  let status = "init"; // init | not-configured | online | syncing | offline | error
+  let status = "init";
   const listeners = { change: [], status: [] };
 
   const emit = (type, payload) => listeners[type].forEach(fn => { try { fn(payload); } catch (e) {} });
   const on = (type, fn) => { listeners[type].push(fn); return () => { listeners[type] = listeners[type].filter(f => f !== fn); }; };
   const setStatus = s => { status = s; emit("status", s); };
 
-  // ── config ──────────────────────────────────────────────
   function getConfig() {
     if (HARDCODED.url && HARDCODED.key) return { url: HARDCODED.url, key: HARDCODED.key, source: "hardcoded" };
     try { const r = JSON.parse(localStorage.getItem(CFG_KEY) || "null"); if (r && r.url && r.key) return { ...r, source: "local" }; } catch (e) {}
@@ -177,14 +151,11 @@
   const configured = () => !!getConfig();
   const configSource = () => (getConfig() || {}).source || null;
 
-  // ── cache (localStorage) ────────────────────────────────
   const getCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "[]"); } catch (e) { return []; } };
   const setCache = entries => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(entries)); } catch (e) {} };
 
-  // ── mapping row <-> entry ───────────────────────────────
   function rowToEntry(row) {
     const rawGrades = row.grades || {};
-    // releaseTime ถูกฝังไว้ใน grades JSON (ไม่ต้องเพิ่มคอลัมน์ในฐานข้อมูล)
     const { __releaseTime, __departLocation, ...grades } = rawGrades;
     const e = {
       id:             String(row.id),
@@ -220,14 +191,27 @@
     (b.purchaseDate || "").localeCompare(a.purchaseDate || "") ||
     String(b.at || "").localeCompare(String(a.at || "")));
 
-  // ── init + realtime ─────────────────────────────────────
+  // Create client immediately if config is available (needed for auth before init())
+  (function earlyInit() {
+    const cfg = getConfig();
+    if (cfg && window.supabase && window.supabase.createClient) {
+      try {
+        client = window.supabase.createClient(cfg.url, cfg.key, {
+          realtime: { params: { eventsPerSecond: 3 } }
+        });
+      } catch (e) {}
+    }
+  })();
+
   function init() {
     const cfg = getConfig();
     if (!cfg) { setStatus("not-configured"); return false; }
     if (!window.supabase || !window.supabase.createClient) { setStatus("error"); return false; }
-    try {
-      client = window.supabase.createClient(cfg.url, cfg.key, { realtime: { params: { eventsPerSecond: 3 } } });
-    } catch (e) { setStatus("error"); return false; }
+    if (!client) {
+      try {
+        client = window.supabase.createClient(cfg.url, cfg.key, { realtime: { params: { eventsPerSecond: 3 } } });
+      } catch (e) { setStatus("error"); return false; }
+    }
     subscribe();
     return true;
   }
@@ -241,7 +225,6 @@
       .subscribe(st => { if (st === "SUBSCRIBED" && status !== "offline") setStatus("online"); });
   }
 
-  // ── fetch ───────────────────────────────────────────────
   async function fetchAll() {
     if (!client) return getCache();
     setStatus("syncing");
@@ -258,7 +241,6 @@
     catch (e) { emit("change", getCache()); return getCache(); }
   }
 
-  // ── offline queue ───────────────────────────────────────
   const getQueue = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch (e) { return []; } };
   const setQueue = q => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {} };
   const queueOp = op => { const q = getQueue(); q.push(op); setQueue(q); };
@@ -279,7 +261,6 @@
     if (!remaining.length) { emit("status", status); refresh(); }
   }
 
-  // ── write ops (optimistic + cache + queue) ──────────────
   async function upsert(entry) {
     const withSum = { ...entry, sum: window.Helpers.calc(entry) };
     setCache(sortEntries([withSum, ...getCache().filter(e => String(e.id) !== String(entry.id))]));
@@ -299,7 +280,6 @@
     } catch (e) { queueOp({ type: "remove", id: String(id) }); setStatus("offline"); }
   }
 
-  // ── migration (ข้อมูลเดิมใน localStorage → ฐานข้อมูลกลาง) ──
   const getOldData = () => { try { return JSON.parse(localStorage.getItem(OLD_KEY) || "[]"); } catch (e) { return []; } };
   const migrationPending = () => !localStorage.getItem(MIGRATED_KEY) && getOldData().length > 0;
   const markMigrated = () => localStorage.setItem(MIGRATED_KEY, new Date().toISOString());
@@ -314,12 +294,27 @@
     await refresh();
   }
 
-  // ── network listeners ───────────────────────────────────
   window.addEventListener("online",  () => { if (client) { flushQueue(); refresh(); } });
   window.addEventListener("offline", () => setStatus("offline"));
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && client) { flushQueue(); refresh(); }
   });
+
+  // Auth methods (uses same Supabase client)
+  const auth = {
+    signIn: (email, password) =>
+      client
+        ? client.auth.signInWithPassword({ email, password })
+        : Promise.resolve({ data: null, error: { message: "ยังไม่ได้ตั้งค่าฐานข้อมูล" } }),
+    signOut: () =>
+      client ? client.auth.signOut() : Promise.resolve({ error: null }),
+    getSession: () =>
+      client ? client.auth.getSession() : Promise.resolve({ data: { session: null }, error: null }),
+    onAuthStateChange: (cb) =>
+      client
+        ? client.auth.onAuthStateChange(cb)
+        : { data: { subscription: { unsubscribe: () => {} } } },
+  };
 
   window.DurianDB = {
     configured, getConfig, setConfig, clearConfig, configSource,
@@ -329,14 +324,12 @@
     on, getStatus: () => status,
     migrationPending, getOldData, markMigrated, pushAll,
     entryToRow, rowToEntry,
+    auth,
   };
 })();
-
 </script>
 <script type="text/babel">
-/* ───────────────────────────────────────────────────────────
-   app.jsx — UI หลัก (React) เชื่อมฐานข้อมูลกลางผ่าน window.DurianDB
-   ─────────────────────────────────────────────────────────── */
+/* ── app.jsx ── */
 const { useState, useEffect, useRef } = React;
 const { GRADES, GOLD, GOLD_L, LOCATIONS, initG, emptyForm, calc, f2, fd, newId, nowHM, calcETA } = window.Helpers;
 const DB = window.DurianDB;
@@ -347,8 +340,6 @@ const S = {
   inp:  { width: "100%" },
 };
 
-/* ───── ตรวจหารายการซ้ำ (ข้อมูลเหมือนกันทุกช่อง) ─────
-   ลายเซ็น (signature) = รวมทุกฟิลด์ที่มีความหมาย หากตรงกัน = บันทึกซ้ำ */
 function entrySig(e) {
   const g = GRADES.map(gr => {
     const w = parseFloat(e.grades?.[gr.id]?.weight) || 0;
@@ -363,11 +354,10 @@ function entrySig(e) {
   ].join("#");
 }
 
-// คืน id ของรายการซ้ำที่ควรลบ (เก็บรายการล่าสุดของแต่ละกลุ่มไว้)
 function findDuplicateIds(list) {
   const groups = {};
   list.forEach(e => {
-    if (!(e.licensePlate || "").trim()) return; // ข้ามรายการที่ไม่มีทะเบียน
+    if (!(e.licensePlate || "").trim()) return;
     const k = entrySig(e);
     (groups[k] = groups[k] || []).push(e);
   });
@@ -377,13 +367,83 @@ function findDuplicateIds(list) {
       g.sort((a, b) =>
         String(b.updatedAt || b.at || "").localeCompare(String(a.updatedAt || a.at || "")) ||
         String(b.id).localeCompare(String(a.id)));
-      g.slice(1).forEach(e => ids.push(e.id)); // เก็บตัวแรก (ล่าสุด) ลบที่เหลือ
+      g.slice(1).forEach(e => ids.push(e.id));
     }
   });
   return ids;
 }
 
-/* ═══ สถานะการเชื่อมต่อฐานข้อมูล ═══ */
+// หมุดปักแบบ Google Maps (SVG วาดเอง)
+function MapPin({ size = 18, color = "#e23b3b", shadow = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      style={{ flexShrink: 0, filter: shadow ? "drop-shadow(0 1px 2px rgba(0,0,0,0.45))" : "none" }}>
+      <path d="M12 1.5c-4.14 0-7.5 3.36-7.5 7.5 0 5.25 7.5 13.5 7.5 13.5s7.5-8.25 7.5-13.5c0-4.14-3.36-7.5-7.5-7.5z"
+        fill={color} stroke="#ffffff" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="12" cy="9" r="2.7" fill="#ffffff" />
+    </svg>
+  );
+}
+
+/* ═══ Login Screen ═══ */
+function LoginScreen({ onLogin }) {
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+
+  async function handleLogin(ev) {
+    ev.preventDefault();
+    if (!email.trim() || !password) { setError("กรุณากรอกอีเมลและรหัสผ่าน"); return; }
+    setLoading(true); setError("");
+    const { data, error: err } = await DB.auth.signIn(email.trim(), password);
+    setLoading(false);
+    if (err) { setError(err.message || "เข้าสู่ระบบไม่สำเร็จ"); return; }
+    onLogin(data.session);
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0D1B2E", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "var(--card)", borderRadius: 16, border: `1px solid ${GOLD}50`, maxWidth: 400, width: "100%", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
+        <div style={{ background: "#0D1B2E", padding: "28px 24px 22px", textAlign: "center", borderBottom: `2px solid ${GOLD}` }}>
+          <div style={{ width: 52, height: 52, borderRadius: 12, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+            <i className="ti ti-leaf" style={{ color: "#0D1B2E", fontSize: 26 }} />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: GOLD, lineHeight: 1.3 }}>บันทึกข้อมูลการจัดส่งทุเรียน</div>
+          <div style={{ fontSize: 12, color: "#aac4e0", marginTop: 5 }}>FF Branch · ห้องเย็นโชติวัฒน์หาดใหญ่</div>
+        </div>
+        <form onSubmit={handleLogin} style={{ padding: "24px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={S.lbl}>อีเมล</label>
+            <input type="email" style={S.inp} placeholder="admin@example.com"
+              value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={S.lbl}>รหัสผ่าน</label>
+            <input type="password" style={S.inp} placeholder="••••••••"
+              value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+          {error && (
+            <div style={{ background: "var(--danger-bg)", color: "var(--danger)", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 16, display: "flex", gap: 7, alignItems: "center" }}>
+              <i className="ti ti-alert-triangle" /> {error}
+            </div>
+          )}
+          <button type="submit" disabled={loading} style={{ background: GOLD, color: "#0D1B2E", border: "none", borderRadius: 9, padding: "12px", fontSize: 15, fontWeight: 700, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1 }}>
+            {loading
+              ? <><i className="ti ti-loader-2" style={{ fontSize: 17 }} /> กำลังเข้าสู่ระบบ…</>
+              : <><i className="ti ti-login" style={{ fontSize: 17 }} /> เข้าสู่ระบบ</>}
+          </button>
+          <div style={{ marginTop: 14, fontSize: 11, color: "var(--muted)", textAlign: "center", lineHeight: 1.6 }}>
+            ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าใช้งาน<br />
+            <span style={{ color: `${GOLD}99` }}>ผู้ดูแลเพิ่มผู้ใช้ได้ที่ Supabase → Authentication → Users</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Status Badge ═══ */
 function StatusBadge({ status, pending, onClick }) {
   const map = {
     online:           { c: "#15803d", bg: "#f0fdf4", dot: "#16a34a", t: "เชื่อมต่อแล้ว",        i: "ti-cloud-check" },
@@ -407,7 +467,7 @@ function StatusBadge({ status, pending, onClick }) {
   );
 }
 
-/* ═══ หน้าตั้งค่าฐานข้อมูล Supabase ═══ */
+/* ═══ Setup Modal ═══ */
 function SetupModal({ initialCfg, onSave, onSkip, onClose, canClose }) {
   const [url, setUrl] = useState(initialCfg?.url || "");
   const [key, setKey] = useState(initialCfg?.key || "");
@@ -452,7 +512,6 @@ function SetupModal({ initialCfg, onSave, onSkip, onClose, canClose }) {
           <div style={{ background: "var(--card2)", border: "1px solid var(--border)", borderRadius: 9, padding: "12px 14px", fontSize: 12, color: "var(--muted)", lineHeight: 1.7, marginBottom: 18 }}>
             <strong style={{ color: "var(--text)" }}>ครั้งแรก?</strong> ต้องสร้างตารางในฐานข้อมูลก่อน — เปิด Supabase → SQL Editor →
             วางสคริปต์จากไฟล์ <code style={{ background: "#0D1B2E", color: GOLD, padding: "1px 6px", borderRadius: 4, fontFamily: "var(--mono)" }}>supabase-schema.sql</code> แล้วกด Run
-            (ดูขั้นตอนละเอียดในไฟล์ <strong style={{ color: "var(--text)" }}>README-ภาษาไทย.md</strong>)
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={submit} style={{ flex: 1, background: GOLD, color: "#0D1B2E", border: "none", borderRadius: 9, padding: "12px", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
@@ -468,19 +527,23 @@ function SetupModal({ initialCfg, onSave, onSkip, onClose, canClose }) {
   );
 }
 
-// หมุดปักแบบ Google Maps (SVG — ไม่พึ่งไอคอนฟอนต์)
-function MapPin({ size = 18, color = "#e23b3b", shadow = false }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      style={{ flexShrink: 0, filter: shadow ? "drop-shadow(0 1px 3px rgba(0,0,0,0.5))" : "none" }}>
-      <path d="M12 1.5c-4.14 0-7.5 3.36-7.5 7.5 0 5.25 7.5 13.5 7.5 13.5s7.5-8.25 7.5-13.5c0-4.14-3.36-7.5-7.5-7.5z"
-        fill={color} stroke="#ffffff" strokeWidth="1.2" strokeLinejoin="round" />
-      <circle cx="12" cy="9" r="2.7" fill="#ffffff" />
-    </svg>
-  );
-}
-
 function App() {
+  // ── Auth state ──
+  const [authSession,  setAuthSession]  = useState(null);
+  const [authLoading,  setAuthLoading]  = useState(true);
+
+  useEffect(() => {
+    DB.auth.getSession().then(({ data }) => {
+      setAuthSession(data?.session || null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = DB.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── App state ──
   const [form,      setForm]      = useState(emptyForm());
   const [entries,   setEntries]   = useState([]);
   const [tab,       setTab]       = useState("form");
@@ -494,24 +557,23 @@ function App() {
   const [importResult, setImportResult] = useState(null);
   const importRef = useRef(null);
 
-  // ── สถานะฐานข้อมูล ──
-  const [dbStatus,   setDbStatus]   = useState(DB.getStatus());
-  const [pending,    setPending]    = useState(0);
-  const [showSetup,  setShowSetup]  = useState(false);
+  const [dbStatus,     setDbStatus]     = useState(DB.getStatus());
+  const [pending,      setPending]      = useState(0);
+  const [showSetup,    setShowSetup]    = useState(false);
   const [migrateCount, setMigrateCount] = useState(0);
   const dedupingRef = useRef(false);
 
   useEffect(() => {
-    setEntries(DB.getCache()); // แสดงจาก cache ทันที
+    if (!authSession) return; // don't init DB until logged in
+    setEntries(DB.getCache());
     const offStatus = DB.on("status", s => { setDbStatus(s); setPending(DB.queueCount()); });
     const offChange = DB.on("change", list => setEntries(list));
     setDbStatus(DB.getStatus());
     if (!DB.configured()) setShowSetup(true);
     else startDb();
     return () => { offStatus(); offChange(); };
-  }, []);
+  }, [authSession]);
 
-  // ── ลบรายการซ้ำอัตโนมัติ เมื่อข้อมูลเปลี่ยน ──
   useEffect(() => {
     if (dedupingRef.current) return;
     if (findDuplicateIds(entries).length) runDedupe(true);
@@ -537,29 +599,24 @@ function App() {
   }
 
   const s = calc(form);
-
-  const sf = (k, v)     => setForm(f => ({ ...f, [k]: v }));
-  const sg = (id, fk, v) => setForm(f => ({ ...f, grades: { ...f.grades, [id]: { ...f.grades[id], [fk]: v } } }));
-  const sef = (k, v)     => setEditForm(f => ({ ...f, [k]: v }));
+  const sf  = (k, v)      => setForm(f => ({ ...f, [k]: v }));
+  const sg  = (id, fk, v) => setForm(f => ({ ...f, grades: { ...f.grades, [id]: { ...f.grades[id], [fk]: v } } }));
+  const sef = (k, v)      => setEditForm(f => ({ ...f, [k]: v }));
   const seg = (id, fk, v) => setEditForm(f => ({ ...f, grades: { ...f.grades, [id]: { ...f.grades[id], [fk]: v } } }));
-
   const flash2 = (type, msg) => { setFlash({ type, msg }); setTimeout(() => setFlash(null), 2800); };
 
-  // ── ตั้งค่าฐานข้อมูล ──
   function handleSetupSave(url, key) {
     DB.setConfig(url, key);
     setShowSetup(false);
     startDb();
     flash2("ok", "เชื่อมต่อฐานข้อมูลแล้ว — กำลังโหลดข้อมูล…");
   }
-  function handleDisconnect() {
-    DB.clearConfig();
-    setShowSetup(false);
-    setDbStatus("not-configured");
-    flash2("ok", "ยกเลิกการเชื่อมต่อแล้ว");
+
+  async function handleLogout() {
+    await DB.auth.signOut();
+    setAuthSession(null);
   }
 
-  // ── ย้ายข้อมูลเดิมขึ้นคลาวด์ ──
   async function doMigrate() {
     const old = DB.getOldData().map(e => ({ ...e, id: String(e.id) }));
     if (!old.length) { setMigrateCount(0); return; }
@@ -584,6 +641,13 @@ function App() {
     setExp(null);
   }
 
+  function setDeptLoc(entry, val, ev) {
+    if (ev) ev.stopPropagation();
+    const updated = { ...entry, departLocation: val || "", updatedAt: new Date().toISOString() };
+    setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
+    DB.upsert(updated);
+  }
+
   function saveEdit(id) {
     if (!editForm.licensePlate.trim()) { flash2("err", "กรุณากรอกทะเบียนรถ"); return; }
     const es = calc(editForm);
@@ -598,7 +662,6 @@ function App() {
 
   function cancelEdit() { setEditingId(null); setEditForm(null); }
 
-  // ตั้ง/แก้เวลาปล่อยรถของรายการโดยตรงจากการ์ด (ไม่ต้องเข้าโหมดแก้ไข)
   function setRelease(entry, val, ev) {
     if (ev) ev.stopPropagation();
     const updated = { ...entry, releaseTime: val || "", updatedAt: new Date().toISOString() };
@@ -606,14 +669,6 @@ function App() {
     DB.upsert(updated);
     if (val) flash2("ok", `ปล่อยรถ ${entry.licensePlate || ""} เวลา ${val} ✓`);
     else flash2("ok", "ล้างเวลาปล่อยรถแล้ว");
-  }
-
-  // ตั้งจุดปล่อยรถโดยตรงจากการ์ด (ไม่ต้องเข้าโหมดแก้ไข)
-  function setDeptLoc(entry, val, ev) {
-    if (ev) ev.stopPropagation();
-    const updated = { ...entry, departLocation: val || "", updatedAt: new Date().toISOString() };
-    setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
-    DB.upsert(updated);
   }
 
   function save() {
@@ -707,18 +762,15 @@ function App() {
         if (!ws) { flash2("err", "ไม่พบ sheet 'การจัดส่งทุเรียน' ในไฟล์นี้"); return; }
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         if (rows.length < 2) { flash2("err", "ไม่พบข้อมูลในไฟล์"); return; }
-
         let added = 0, skipped = 0, dupes = 0;
         const addedEntries = [];
         const existingKeys = new Set(entries.map(e => `${e.licensePlate}|${e.purchaseDate}`));
-
-        rows.slice(1).forEach((r, idx) => {
+        rows.slice(1).forEach((r) => {
           const plate = String(r[0] || "").trim();
           const buyDate = String(r[1] || "").trim();
           if (!plate || !buyDate) { skipped++; return; }
           const key = `${plate}|${buyDate}`;
           if (existingKeys.has(key)) { dupes++; return; }
-
           const grades = {};
           GRADES.forEach((g, i) => {
             const w = parseFloat(r[12 + i * 3]) || 0;
@@ -739,12 +791,9 @@ function App() {
           existingKeys.add(key);
           added++;
         });
-
-        // optimistic + push to DB
         const merged = [...addedEntries, ...entries].sort((a, b) => (b.purchaseDate || "").localeCompare(a.purchaseDate || ""));
         setEntries(merged);
         addedEntries.forEach(e => DB.upsert(e));
-
         setImportResult({ added, dupes, skipped, file: file.name });
         setTimeout(() => setImportResult(null), 6000);
       } catch (err) {
@@ -755,17 +804,32 @@ function App() {
     reader.readAsArrayBuffer(file);
   }
 
-  // ── filtered ──
   const filteredEntries = entries.filter(e => {
     if (filterFrom && e.purchaseDate < filterFrom) return false;
     if (filterTo   && e.purchaseDate > filterTo)   return false;
     return true;
   });
-  const fW  = filteredEntries.reduce((a, e) => a + (e.sum?.tw || 0), 0);
-  const fV  = filteredEntries.reduce((a, e) => a + (e.sum?.tv || 0), 0);
-  const fA  = fW > 0 ? fV / fW : 0;
+  const fW   = filteredEntries.reduce((a, e) => a + (e.sum?.tw || 0), 0);
+  const fV   = filteredEntries.reduce((a, e) => a + (e.sum?.tv || 0), 0);
+  const fA   = fW > 0 ? fV / fW : 0;
   const fPay = filteredEntries.reduce((a, e) => a + (e.sum?.totalPay || 0), 0);
   const isFiltered = filterFrom || filterTo;
+
+  // ── Render guards ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0D1B2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", color: GOLD }}>
+          <i className="ti ti-loader-2" style={{ fontSize: 40 }} />
+          <div style={{ marginTop: 14, fontSize: 14, color: "#aac4e0" }}>กำลังโหลด…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authSession) {
+    return <LoginScreen onLogin={setAuthSession} />;
+  }
 
   return (
     <div style={{ fontFamily: "var(--font)", paddingBottom: 48 }}>
@@ -792,6 +856,16 @@ function App() {
         </div>
         <StatusBadge status={dbStatus} pending={pending} onClick={() => setShowSetup(true)} />
         <div style={{ fontSize: 12, color: "var(--muted)" }}>{entries.length} รายการ</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>
+          <i className="ti ti-user-circle" style={{ fontSize: 15, color: GOLD }} />
+          {authSession.user?.email}
+        </div>
+        <button onClick={handleLogout} title="ออกจากระบบ" style={{
+          background: "none", border: "1px solid var(--border2)", borderRadius: 7,
+          color: "var(--muted)", padding: "5px 12px", fontSize: 12,
+          display: "flex", alignItems: "center", gap: 5 }}>
+          <i className="ti ti-logout" style={{ fontSize: 13 }} /> ออกจากระบบ
+        </button>
       </div>
 
       {/* FLASH */}
@@ -874,14 +948,14 @@ function App() {
                           onClick={() => sf("departLocation", on ? "" : loc.id)}
                           style={{ flex: 1, minWidth: 150, padding: "13px 16px", borderRadius: 10, fontSize: 14, fontWeight: 700, fontFamily: "var(--font)", cursor: "pointer",
                             border: `2px solid ${on ? "#e23b3b" : "var(--border2)"}`,
-                            background: on ? "#e23b3b12" : "var(--card2)",
-                            color: on ? "#c0392b" : "var(--muted)",
-                            boxShadow: on ? "0 3px 14px #e23b3b30" : "none",
+                            background: on ? "#e23b3b18" : "#0D1B2E",
+                            color: on ? "#fff" : "var(--muted)",
+                            boxShadow: on ? "0 3px 14px #e23b3b40" : "none",
                             display: "flex", alignItems: "center", gap: 9, justifyContent: "center", transition: "all 0.15s" }}>
                           <MapPin size={20} shadow={on} />
                           <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.25 }}>
                             {loc.label}
-                            <span style={{ fontSize: 11, fontWeight: 500, color: on ? "#e23b3b99" : "#9ca3af", whiteSpace: "nowrap" }}>+{loc.mins / 60} ชม. → นาหม่อม</span>
+                            <span style={{ fontSize: 11, fontWeight: 500, color: on ? "#ffffffcc" : "#6f86a8", whiteSpace: "nowrap" }}>+{loc.mins / 60} ชม. → นาหม่อม</span>
                           </span>
                         </button>
                       );
@@ -1066,10 +1140,10 @@ function App() {
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginBottom: 18 }}>
                   {[
-                    { lb: "จำนวนรถ", v: filteredEntries.length + " คัน", sub: null, ic: "ti-truck" },
-                    { lb: "น้ำหนักรวม", v: f2(fW, 0) + " กก.", sub: null, ic: "ti-weight" },
-                    { lb: "มูลค่า RM รวม", v: f2(fV, 0) + " ฿", sub: null, ic: "ti-cash" },
-                    { lb: "ราคาเฉลี่ย", v: f2(fA) + " ฿/กก.", sub: null, ic: "ti-chart-line" },
+                    { lb: "จำนวนรถ", v: filteredEntries.length + " คัน", ic: "ti-truck" },
+                    { lb: "น้ำหนักรวม", v: f2(fW, 0) + " กก.", ic: "ti-weight" },
+                    { lb: "มูลค่า RM รวม", v: f2(fV, 0) + " ฿", ic: "ti-cash" },
+                    { lb: "ราคาเฉลี่ย", v: f2(fA) + " ฿/กก.", ic: "ti-chart-line" },
                   ].map(c => (
                     <div key={c.lb} style={{ background: "var(--card2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                       <i className={`ti ${c.ic}`} style={{ fontSize: 18, color: GOLD }} />
@@ -1163,17 +1237,21 @@ function App() {
                             </div>
                             <div style={{ gridColumn: "1 / -1" }}><label style={S.lbl}>จุดปล่อยรถ</label>
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                {LOCATIONS.map(loc => (
-                                  <button key={loc.id} type="button"
-                                    onClick={() => sef("departLocation", editForm.departLocation === loc.id ? "" : loc.id)}
-                                    style={{ flex: 1, minWidth: 120, padding: "7px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, fontFamily: "var(--font)",
-                                      border: `1px solid ${editForm.departLocation === loc.id ? GOLD : "var(--border2)"}`,
-                                      background: editForm.departLocation === loc.id ? `${GOLD}22` : "transparent",
-                                      color: editForm.departLocation === loc.id ? GOLD : "var(--muted)",
-                                      display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                                    <MapPin size={15} shadow={editForm.departLocation === loc.id} />{loc.short}
-                                  </button>
-                                ))}
+                                {LOCATIONS.map(loc => {
+                                  const on = editForm.departLocation === loc.id;
+                                  return (
+                                    <button key={loc.id} type="button"
+                                      onClick={() => sef("departLocation", on ? "" : loc.id)}
+                                      style={{ flex: 1, minWidth: 120, padding: "9px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "var(--font)", cursor: "pointer",
+                                        border: `2px solid ${on ? "#e23b3b" : "var(--border2)"}`,
+                                        background: on ? "#e23b3b18" : "#0D1B2E",
+                                        color: on ? "#fff" : "var(--muted)",
+                                        boxShadow: on ? "0 2px 10px #e23b3b40" : "none",
+                                        display: "flex", alignItems: "center", gap: 7, justifyContent: "center" }}>
+                                      <MapPin size={16} shadow={on} />{loc.short}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -1281,43 +1359,43 @@ function App() {
                                 </span>
                               )}
                               {/* จุดปล่อยรถ */}
-              <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", alignItems: "center" }} onClick={ev => ev.stopPropagation()}>
-                {entry.departLocation ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#091a30", border: "1px solid #3a6faa80", borderRadius: 6, padding: "3px 9px" }}>
-                      <MapPin size={14} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#a0cff5" }}>{LOCATIONS.find(l => l.id === entry.departLocation)?.label || entry.departLocation}</span>
-                    </span>
-                    <button onClick={ev => setDeptLoc(entry, "", ev)} title="เปลี่ยนจุดปล่อยรถ" style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12, padding: 2, lineHeight: 1 }}>
-                      <i className="ti ti-x" />
-                    </button>
-                  </span>
-                ) : (
-                  LOCATIONS.map(loc => (
-                    <button key={loc.id} onClick={ev => setDeptLoc(entry, loc.id, ev)}
-                      style={{ background: "transparent", border: "1px dashed #3a6faa", color: "#7eb8f0", borderRadius: 5,
-                        padding: "2px 9px", fontSize: 10, fontWeight: 600, fontFamily: "var(--font)", whiteSpace: "nowrap",
-                        display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <MapPin size={12} />{loc.short}
-                    </button>
-                  ))
-                )}
-              </span>
-              {/* ETA ถึงนาหม่อม สงขลา */}
-              {(() => {
-                const eta = calcETA(entry.releaseTime, entry.departLocation);
-                const loc = LOCATIONS.find(l => l.id === entry.departLocation);
-                if (!eta || !loc) return null;
-                return (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#071a0e", border: "1px solid #2d7a4080", borderRadius: 6, padding: "3px 10px" }}>
-                    <i className="ti ti-flag-check" style={{ fontSize: 12, color: "#4ade80" }} />
-                    <span style={{ fontSize: 11, color: "#86efac" }}>ถึงประมาณ</span>
-                    <span style={{ fontFamily: "var(--mono)", fontWeight: 700, color: "#4ade80", fontSize: 14 }}>{eta}</span>
-                    <span style={{ fontSize: 9, color: "#6ee7b7", letterSpacing: "0.03em" }}>({loc.mins / 60} ชม.)</span>
-                  </span>
-                );
-              })()}
-              {entry.notes && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>{entry.notes}</span>}
+                              <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", alignItems: "center" }} onClick={ev => ev.stopPropagation()}>
+                                {entry.departLocation ? (
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#091a30", border: "1px solid #3a6faa80", borderRadius: 6, padding: "3px 9px" }}>
+                                      <MapPin size={15} />
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: "#a0cff5" }}>{LOCATIONS.find(l => l.id === entry.departLocation)?.label || entry.departLocation}</span>
+                                    </span>
+                                    <button onClick={ev => setDeptLoc(entry, "", ev)} title="เปลี่ยนจุดปล่อยรถ" style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12, padding: 2, lineHeight: 1 }}>
+                                      <i className="ti ti-x" />
+                                    </button>
+                                  </span>
+                                ) : (
+                                  LOCATIONS.map(loc => (
+                                    <button key={loc.id} onClick={ev => setDeptLoc(entry, loc.id, ev)}
+                                      style={{ background: "#0D1B2E", border: "1.5px solid #e23b3b80", color: "#f0a0a0", borderRadius: 6,
+                                        padding: "4px 11px", fontSize: 11, fontWeight: 700, fontFamily: "var(--font)", whiteSpace: "nowrap", cursor: "pointer",
+                                        display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                      <MapPin size={13} />{loc.short}
+                                    </button>
+                                  ))
+                                )}
+                              </span>
+                              {/* ETA ถึงนาหม่อม สงขลา */}
+                              {(() => {
+                                const eta = calcETA(entry.releaseTime, entry.departLocation);
+                                const loc = LOCATIONS.find(l => l.id === entry.departLocation);
+                                if (!eta || !loc) return null;
+                                return (
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#071a0e", border: "1px solid #2d7a4080", borderRadius: 6, padding: "3px 10px" }}>
+                                    <i className="ti ti-flag-check" style={{ fontSize: 12, color: "#4ade80" }} />
+                                    <span style={{ fontSize: 11, color: "#86efac" }}>ถึงประมาณ</span>
+                                    <span style={{ fontFamily: "var(--mono)", fontWeight: 700, color: "#4ade80", fontSize: 14 }}>{eta}</span>
+                                    <span style={{ fontSize: 9, color: "#6ee7b7", letterSpacing: "0.03em" }}>({loc.mins / 60} ชม.)</span>
+                                  </span>
+                                );
+                              })()}
+                              {entry.notes && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>{entry.notes}</span>}
                             </div>
                             <div style={{ flex: 1, minWidth: 200 }}>
                               <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, fontWeight: 600 }}>รายละเอียดเบอร์</div>
@@ -1418,7 +1496,6 @@ function App() {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
-
 </script>
 </body>
 </html>
