@@ -468,6 +468,18 @@ function SetupModal({ initialCfg, onSave, onSkip, onClose, canClose }) {
   );
 }
 
+// หมุดปักแบบ Google Maps (SVG — ไม่พึ่งไอคอนฟอนต์)
+function MapPin({ size = 18, color = "#e23b3b", shadow = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      style={{ flexShrink: 0, filter: shadow ? "drop-shadow(0 1px 3px rgba(0,0,0,0.5))" : "none" }}>
+      <path d="M12 1.5c-4.14 0-7.5 3.36-7.5 7.5 0 5.25 7.5 13.5 7.5 13.5s7.5-8.25 7.5-13.5c0-4.14-3.36-7.5-7.5-7.5z"
+        fill={color} stroke="#ffffff" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="12" cy="9" r="2.7" fill="#ffffff" />
+    </svg>
+  );
+}
+
 function App() {
   const [form,      setForm]      = useState(emptyForm());
   const [entries,   setEntries]   = useState([]);
@@ -854,18 +866,26 @@ function App() {
                   </div>
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}><label style={S.lbl}>จุดปล่อยรถ</label>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {LOCATIONS.map(loc => (
-                      <button key={loc.id} type="button"
-                        onClick={() => sf("departLocation", form.departLocation === loc.id ? "" : loc.id)}
-                        style={{ flex: 1, minWidth: 130, padding: "8px 14px", borderRadius: 7, fontSize: 13, fontWeight: 600, fontFamily: "var(--font)",
-                          border: `1px solid ${form.departLocation === loc.id ? GOLD : "var(--border2)"}`,
-                          background: form.departLocation === loc.id ? `${GOLD}22` : "transparent",
-                          color: form.departLocation === loc.id ? GOLD : "var(--muted)",
-                          display: "flex", alignItems: "center", gap: 7, justifyContent: "center", transition: "all 0.15s" }}>
-                        <i className="ti ti-map-pin" style={{ fontSize: 14 }} />{loc.label}
-                      </button>
-                    ))}
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {LOCATIONS.map(loc => {
+                      const on = form.departLocation === loc.id;
+                      return (
+                        <button key={loc.id} type="button"
+                          onClick={() => sf("departLocation", on ? "" : loc.id)}
+                          style={{ flex: 1, minWidth: 150, padding: "13px 16px", borderRadius: 10, fontSize: 14, fontWeight: 700, fontFamily: "var(--font)", cursor: "pointer",
+                            border: `2px solid ${on ? "#e23b3b" : "var(--border2)"}`,
+                            background: on ? "#e23b3b12" : "var(--card2)",
+                            color: on ? "#c0392b" : "var(--muted)",
+                            boxShadow: on ? "0 3px 14px #e23b3b30" : "none",
+                            display: "flex", alignItems: "center", gap: 9, justifyContent: "center", transition: "all 0.15s" }}>
+                          <MapPin size={20} shadow={on} />
+                          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.25 }}>
+                            {loc.label}
+                            <span style={{ fontSize: 11, fontWeight: 500, color: on ? "#e23b3b99" : "#9ca3af", whiteSpace: "nowrap" }}>+{loc.mins / 60} ชม. → นาหม่อม</span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1151,7 +1171,7 @@ function App() {
                                       background: editForm.departLocation === loc.id ? `${GOLD}22` : "transparent",
                                       color: editForm.departLocation === loc.id ? GOLD : "var(--muted)",
                                       display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                                    <i className="ti ti-map-pin" style={{ fontSize: 13 }} />{loc.short}
+                                    <MapPin size={15} shadow={editForm.departLocation === loc.id} />{loc.short}
                                   </button>
                                 ))}
                               </div>
@@ -1265,7 +1285,7 @@ function App() {
                 {entry.departLocation ? (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#091a30", border: "1px solid #3a6faa80", borderRadius: 6, padding: "3px 9px" }}>
-                      <i className="ti ti-map-pin" style={{ fontSize: 12, color: "#7eb8f0" }} />
+                      <MapPin size={14} />
                       <span style={{ fontSize: 12, fontWeight: 600, color: "#a0cff5" }}>{LOCATIONS.find(l => l.id === entry.departLocation)?.label || entry.departLocation}</span>
                     </span>
                     <button onClick={ev => setDeptLoc(entry, "", ev)} title="เปลี่ยนจุดปล่อยรถ" style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12, padding: 2, lineHeight: 1 }}>
@@ -1278,7 +1298,7 @@ function App() {
                       style={{ background: "transparent", border: "1px dashed #3a6faa", color: "#7eb8f0", borderRadius: 5,
                         padding: "2px 9px", fontSize: 10, fontWeight: 600, fontFamily: "var(--font)", whiteSpace: "nowrap",
                         display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <i className="ti ti-map-pin" style={{ fontSize: 10 }} />{loc.short}
+                      <MapPin size={12} />{loc.short}
                     </button>
                   ))
                 )}
