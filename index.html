@@ -549,6 +549,7 @@ function App() {
   const [tab,       setTab]       = useState("form");
   const [flash,     setFlash]     = useState(null);
   const [exp,       setExp]       = useState(null);
+  const [page,      setPage]      = useState(1);
   const [errs,      setErrs]      = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editForm,  setEditForm]  = useState(null);
@@ -814,6 +815,18 @@ function App() {
   const fA   = fW > 0 ? fV / fW : 0;
   const fPay = filteredEntries.reduce((a, e) => a + (e.sum?.totalPay || 0), 0);
   const isFiltered = filterFrom || filterTo;
+
+  // ── Pagination: 50 รายการ (คัน) ต่อหน้า ──
+  const PAGE_SIZE = 50;
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+  const curPage = Math.min(Math.max(1, page), totalPages);
+  const pageStart = (curPage - 1) * PAGE_SIZE;
+  const pagedEntries = filteredEntries.slice(pageStart, pageStart + PAGE_SIZE);
+  const pgBtn = { background: "none", border: `1px solid ${GOLD}60`, color: GOLD, borderRadius: 7,
+    padding: "7px 14px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font)",
+    display: "inline-flex", alignItems: "center", gap: 5 };
+  const gotoPage = n => { setPage(Math.min(Math.max(1, n), totalPages)); setExp(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // ── Render guards ──
   if (authLoading) {
@@ -1098,14 +1111,14 @@ function App() {
               <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <label style={S.lbl}>ตั้งแต่วันที่</label>
-                  <input type="date" style={S.inp} value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setExp(null); }} />
+                  <input type="date" style={S.inp} value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setExp(null); setPage(1); }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <label style={S.lbl}>ถึงวันที่</label>
-                  <input type="date" style={S.inp} value={filterTo} onChange={e => { setFilterTo(e.target.value); setExp(null); }} />
+                  <input type="date" style={S.inp} value={filterTo} onChange={e => { setFilterTo(e.target.value); setExp(null); setPage(1); }} />
                 </div>
                 <div style={{ display: "flex", gap: 8, paddingBottom: 1 }}>
-                  <button onClick={() => { setFilterFrom(""); setFilterTo(""); setExp(null); }} style={{
+                  <button onClick={() => { setFilterFrom(""); setFilterTo(""); setExp(null); setPage(1); }} style={{
                     background: "none", border: "1px solid var(--border2)", color: "var(--muted)",
                     borderRadius: 7, padding: "7px 16px", fontSize: 13, fontFamily: "var(--font)",
                     display: "flex", alignItems: "center", gap: 5,
@@ -1202,7 +1215,16 @@ function App() {
                   </div>
                 )}
 
-                {filteredEntries.map(entry => {
+                {filteredEntries.length > PAGE_SIZE && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12, fontSize: 12, color: "var(--muted)" }}>
+                    <span>
+                      แสดง <strong style={{ color: GOLD }}>{pageStart + 1}–{pageStart + pagedEntries.length}</strong> จาก <strong style={{ color: GOLD }}>{filteredEntries.length}</strong> คัน
+                    </span>
+                    <span>หน้า <strong style={{ color: GOLD }}>{curPage}</strong> / {totalPages}</span>
+                  </div>
+                )}
+
+                {pagedEntries.map(entry => {
                   const isEditing = editingId === entry.id;
                   const es = isEditing ? calc(editForm) : null;
                   return (
@@ -1485,6 +1507,36 @@ function App() {
                     </div>
                   );
                 })}
+
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                    <button onClick={() => gotoPage(curPage - 1)} disabled={curPage <= 1}
+                      style={{ ...pgBtn, opacity: curPage <= 1 ? 0.4 : 1, cursor: curPage <= 1 ? "default" : "pointer" }}>
+                      <i className="ti ti-chevron-left" style={{ fontSize: 14 }} /> ก่อนหน้า
+                    </button>
+                    {(() => {
+                      const pages = [], win = 2;
+                      for (let i = 1; i <= totalPages; i++) {
+                        if (i === 1 || i === totalPages || (i >= curPage - win && i <= curPage + win)) pages.push(i);
+                        else if (pages[pages.length - 1] !== "…") pages.push("…");
+                      }
+                      return pages.map((p, idx) => p === "…"
+                        ? <span key={"e" + idx} style={{ color: "var(--muted)", padding: "0 4px" }}>…</span>
+                        : <button key={p} onClick={() => gotoPage(p)}
+                            style={{ ...pgBtn, minWidth: 38, justifyContent: "center", cursor: "pointer",
+                              background: p === curPage ? GOLD : "none",
+                              color: p === curPage ? "#0D1B2E" : GOLD,
+                              borderColor: p === curPage ? GOLD : `${GOLD}60`,
+                              fontWeight: p === curPage ? 700 : 600 }}>
+                            {p}
+                          </button>);
+                    })()}
+                    <button onClick={() => gotoPage(curPage + 1)} disabled={curPage >= totalPages}
+                      style={{ ...pgBtn, opacity: curPage >= totalPages ? 0.4 : 1, cursor: curPage >= totalPages ? "default" : "pointer" }}>
+                      ถัดไป <i className="ti ti-chevron-right" style={{ fontSize: 14 }} />
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
