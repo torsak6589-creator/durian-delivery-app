@@ -846,7 +846,7 @@ function App() {
   const dayKey = e => e.purchaseDate || e.arrivalDate || "";
   const unloadDays = (() => {
     const map = {};
-    entries.forEach(e => {
+    filteredEntries.forEach(e => {
       const k = dayKey(e);
       if (!k) return;
       if (!map[k]) map[k] = { date: k, total: 0, done: 0, pending: 0, wDone: 0, wPending: 0, payDone: 0, payPending: 0, items: [] };
@@ -857,11 +857,11 @@ function App() {
     });
     return Object.values(map).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   })();
-  const uTotal = entries.length;
-  const uDone  = entries.filter(e => e.unloadedAt).length;
+  const uTotal = filteredEntries.length;
+  const uDone  = filteredEntries.filter(e => e.unloadedAt).length;
   const uPend  = uTotal - uDone;
-  const uwDone = entries.filter(e => e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
-  const uwPend = entries.filter(e => !e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
+  const uwDone = filteredEntries.filter(e => e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
+  const uwPend = filteredEntries.filter(e => !e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
 
   // ── Render guards ──
   if (authLoading) {
@@ -1590,6 +1590,40 @@ function App() {
         {/* ═══ สรุปการลงรถ (รายวัน) ═══ */}
         {tab === "unload" && (
           <div>
+            <div style={{ ...S.card, marginBottom: 16, padding: "16px 20px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <i className="ti ti-filter" style={{ fontSize: 13 }} /> กรองช่วงวันที่ซื้อ (ใช้ค่าร่วมกับหน้าประวัติ)
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label style={S.lbl}>ตั้งแต่วันที่</label>
+                  <input type="date" style={S.inp} value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setExpDay(null); setPage(1); }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label style={S.lbl}>ถึงวันที่</label>
+                  <input type="date" style={S.inp} value={filterTo} onChange={e => { setFilterTo(e.target.value); setExpDay(null); setPage(1); }} />
+                </div>
+                <div style={{ display: "flex", gap: 8, paddingBottom: 1 }}>
+                  <button onClick={() => { setFilterFrom(""); setFilterTo(""); setExpDay(null); setPage(1); }} style={{
+                    background: "none", border: "1px solid var(--border2)", color: "var(--muted)",
+                    borderRadius: 7, padding: "7px 16px", fontSize: 13, fontFamily: "var(--font)",
+                    display: "flex", alignItems: "center", gap: 5,
+                    opacity: isFiltered ? 1 : 0.4, cursor: isFiltered ? "pointer" : "default" }}>
+                    <i className="ti ti-x" style={{ fontSize: 13 }} /> ล้าง
+                  </button>
+                </div>
+              </div>
+              {isFiltered && (
+                <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <i className="ti ti-info-circle" style={{ color: GOLD }} />
+                  สรุปเฉพาะ <strong style={{ color: GOLD }}>{filteredEntries.length}</strong> รายการที่กรอง
+                  {filterFrom && <> ตั้งแต่ <strong style={{ color: "var(--text)" }}>{fd(filterFrom)}</strong></>}
+                  {filterTo && <> ถึง <strong style={{ color: "var(--text)" }}>{fd(filterTo)}</strong></>}
+                  {" "}(จากทั้งหมด {entries.length} รายการ)
+                </div>
+              )}
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
               {[
                 { lb: "รถทั้งหมด", v: uTotal + " คัน", ic: "ti-truck", c: GOLD },
@@ -1606,10 +1640,11 @@ function App() {
               ))}
             </div>
 
-            {entries.length === 0 ? (
+            {filteredEntries.length === 0 ? (
               <div style={{ textAlign: "center", padding: 60, color: "var(--muted)" }}>
-                <i className="ti ti-clipboard-off" style={{ fontSize: 40, color: GOLD }} />
-                <div style={{ marginTop: 12, fontSize: 14 }}>ยังไม่มีข้อมูลการจัดส่ง</div>
+                <i className={`ti ${entries.length === 0 ? "ti-clipboard-off" : "ti-search"}`} style={{ fontSize: 40, color: GOLD }} />
+                <div style={{ marginTop: 12, fontSize: 14 }}>{entries.length === 0 ? "ยังไม่มีข้อมูลการจัดส่ง" : "ไม่พบรายการในช่วงวันที่ที่เลือก"}</div>
+                {entries.length > 0 && <div style={{ fontSize: 12, marginTop: 6 }}>ลองเปลี่ยนช่วงวันที่หรือกดปุ่ม "ล้าง"</div>}
               </div>
             ) : (
               unloadDays.map(d => {
