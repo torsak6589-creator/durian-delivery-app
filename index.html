@@ -1501,7 +1501,7 @@ function App() {
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, alignSelf: "center", flexShrink: 0 }}>
                               {entry.unloadedAt ? (
-                                <button onClick={ev => setUnloaded(entry, "", ev)} title={`ลงเสร็จเมื่อ ${fdt(entry.unloadedAt)} — กดเพื่อยกเลิก`} style={{ background: "#1a6b3530", border: "1px solid #2d9e52", color: "#6ee7b7", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font)", whiteSpace: "nowrap" }}>
+                                <button onClick={ev => setUnloaded(entry, "", ev)} title={`ลงเสร็จเมื่อ ${fdt(entry.unloadedAt)} — กดเพื่อยกเลิก`} style={{ background: "#2d9e52", border: "1px solid #2d9e52", color: "#06240f", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font)", whiteSpace: "nowrap" }}>
                                   <i className="ti ti-circle-check-filled" style={{ fontSize: 14 }} /> ลงแล้ว {fht(entry.unloadedAt)}
                                 </button>
                               ) : (
