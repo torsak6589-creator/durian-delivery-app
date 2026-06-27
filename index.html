@@ -1505,7 +1505,7 @@ function App() {
                                   <i className="ti ti-circle-check-filled" style={{ fontSize: 14 }} /> ลงแล้ว {fht(entry.unloadedAt)}
                                 </button>
                               ) : (
-                                <button onClick={ev => setUnloaded(entry, new Date().toISOString(), ev)} title="กดเมื่อรถลงของเสร็จแล้ว" style={{ background: "#e8851f1a", border: "1px dashed #f59e0b", color: "#f5b04d", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font)", whiteSpace: "nowrap" }}>
+                                <button onClick={ev => setUnloaded(entry, new Date().toISOString(), ev)} title="กดเมื่อรถลงของเสร็จแล้ว" style={{ background: "#f59e0b", border: "1px solid #f59e0b", color: "#0D1B2E", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font)", whiteSpace: "nowrap" }}>
                                   <i className="ti ti-package-import" style={{ fontSize: 14 }} /> ลงเสร็จแล้ว
                                 </button>
                               )}
@@ -1677,7 +1677,7 @@ function App() {
                                     {it.unloadedAt ? (
                                       <button onClick={() => setUnloaded(it, "")} style={{ background: "none", border: "1px solid var(--border2)", color: "var(--muted)", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: "var(--font)" }}>ยกเลิก</button>
                                     ) : (
-                                      <button onClick={() => setUnloaded(it, new Date().toISOString())} style={{ background: "#e8851f1a", border: "1px solid #f59e0b", color: "#f5b04d", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 600, fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                      <button onClick={() => setUnloaded(it, new Date().toISOString())} style={{ background: "#f59e0b", border: "1px solid #f59e0b", color: "#0D1B2E", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                                         <i className="ti ti-package-import" style={{ fontSize: 13 }} /> ลงเสร็จแล้ว
                                       </button>
                                     )}
