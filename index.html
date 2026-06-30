@@ -656,7 +656,7 @@ function App() {
   // ตั้ง/แก้ลำดับการมาถึงโรงงานโดยตรงจากการ์ด (ไม่ต้องเข้าโหมดแก้ไข)
   function setArrivalOrder(entry, val, ev) {
     if (ev) ev.stopPropagation();
-    const clean = val === "" ? "" : String(Math.max(0, parseInt(val, 10) || 0));
+    const clean = val === "" ? "" : String(Math.min(99, Math.max(1, parseInt(val, 10) || 1)));
     const updated = { ...entry, arrivalOrder: clean, updatedAt: new Date().toISOString() };
     setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
     DB.upsert(updated);
@@ -874,6 +874,12 @@ function App() {
       if (e.unloadedAt) { g.done++; g.wDone += w; g.payDone += pay; }
       else { g.pending++; g.wPending += w; g.payPending += pay; }
     });
+    // เรียงรถในแต่ละวันตามลำดับการถึงโรงงาน (คันที่มีลำดับขึ้นก่อน, ไม่มีลำดับไปท้าย)
+    Object.values(map).forEach(g => g.items.sort((a, b) => {
+      const oa = parseInt(a.arrivalOrder, 10) || Infinity;
+      const ob = parseInt(b.arrivalOrder, 10) || Infinity;
+      return oa - ob;
+    }));
     return Object.values(map).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   })();
   const uTotal = filteredEntries.length;
@@ -1008,7 +1014,7 @@ function App() {
                 </div>
                 <div><label style={S.lbl}>ลำดับรถถึงโรงงาน</label>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <input type="number" min="1" step="1" style={{ ...S.inp, flex: 1, textAlign: "left" }} placeholder="เช่น 1, 2, 3"
+                    <input type="number" min="1" max="99" step="1" inputMode="numeric" style={{ ...S.inp, flex: 1, textAlign: "left" }} placeholder="เช่น 1, 2 … 12"
                       value={form.arrivalOrder} onChange={e => sf("arrivalOrder", e.target.value)} />
                     <button type="button" onClick={() => sf("arrivalOrder", String(nextArrivalOrder))} title={`เติมลำดับถัดไป (${nextArrivalOrder})`} style={{
                       background: `${GOLD}1a`, border: `1px solid ${GOLD}80`, color: GOLD, borderRadius: 6,
@@ -1325,7 +1331,7 @@ function App() {
                               </div>
                             </div>
                             <div><label style={S.lbl}>ลำดับรถถึงโรงงาน</label>
-                              <input type="number" min="1" step="1" style={{ ...S.inp, textAlign: "left" }} placeholder="เช่น 1, 2, 3"
+                              <input type="number" min="1" max="99" step="1" inputMode="numeric" style={{ ...S.inp, textAlign: "left" }} placeholder="เช่น 1, 2 … 12"
                                 value={editForm.arrivalOrder} onChange={e => sef("arrivalOrder", e.target.value)} />
                             </div>
                             <div style={{ gridColumn: "1 / -1" }}><label style={S.lbl}>จุดปล่อยรถ</label>
@@ -1429,16 +1435,17 @@ function App() {
                               <span style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>ลำดับถึง</span>
                               {entry.arrivalOrder ? (
                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                  <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#0D1B2E", border: `2px solid ${GOLD}`, color: GOLD, fontFamily: "var(--mono)", fontWeight: 700, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.arrivalOrder}</span>
+                                  <span style={{ minWidth: 40, height: 40, padding: "0 7px", borderRadius: 20, background: "#0D1B2E", border: `2px solid ${GOLD}`, color: GOLD, fontFamily: "var(--mono)", fontWeight: 700, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.arrivalOrder}</span>
                                   <button onClick={ev => setArrivalOrder(entry, "", ev)} title="ล้างลำดับ" style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12, padding: 2, lineHeight: 1 }}>
                                     <i className="ti ti-x" />
                                   </button>
                                 </span>
                               ) : (
-                                <input type="number" min="1" step="1" placeholder="#"
+                                <input type="number" min="1" max="99" step="1" placeholder="#" inputMode="numeric"
                                   onClick={ev => ev.stopPropagation()}
-                                  onChange={ev => { if (ev.target.value) setArrivalOrder(entry, ev.target.value); }}
-                                  style={{ width: 52, textAlign: "center", padding: "5px 4px", fontSize: 13 }} />
+                                  onKeyDown={ev => { if (ev.key === "Enter") ev.target.blur(); }}
+                                  onBlur={ev => { if (ev.target.value) setArrivalOrder(entry, ev.target.value); }}
+                                  style={{ width: 56, textAlign: "center", padding: "5px 4px", fontSize: 13 }} />
                               )}
                             </div>
                             <div style={{ background: `${GOLD}18`, border: `1px solid ${GOLD}60`, borderRadius: 7, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: GOLD, fontFamily: "var(--mono)", minWidth: 100, textAlign: "center", flexShrink: 0, alignSelf: "center" }}>
@@ -1743,14 +1750,19 @@ function App() {
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
                               <tr style={{ borderBottom: `1px solid ${GOLD}30` }}>
-                                {["ทะเบียนรถ", "น้ำหนัก (กก.)", "สถานะ", "จัดการ"].map((h, i) => (
-                                  <th key={h} style={{ padding: "6px 8px", textAlign: i === 0 ? "left" : i === 1 ? "right" : "center", color: GOLD, fontWeight: 600, fontSize: 10, textTransform: "uppercase" }}>{h}</th>
+                                {["ลำดับ", "ทะเบียนรถ", "น้ำหนัก (กก.)", "สถานะ", "จัดการ"].map((h, i) => (
+                                  <th key={h} style={{ padding: "6px 8px", textAlign: i === 0 ? "center" : i === 1 ? "left" : i === 2 ? "right" : "center", color: GOLD, fontWeight: 600, fontSize: 10, textTransform: "uppercase" }}>{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
                               {d.items.map(it => (
                                 <tr key={it.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                                  <td style={{ padding: "7px 8px", textAlign: "center" }}>
+                                    {it.arrivalOrder
+                                      ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 26, padding: "0 6px", borderRadius: 13, background: "#0D1B2E", border: `1.5px solid ${GOLD}`, color: GOLD, fontFamily: "var(--mono)", fontWeight: 700, fontSize: 13 }}>{it.arrivalOrder}</span>
+                                      : <span style={{ color: "var(--muted)" }}>—</span>}
+                                  </td>
                                   <td style={{ padding: "7px 8px", fontFamily: "var(--mono)", fontWeight: 700, color: GOLD }}>{it.licensePlate || "—"}</td>
                                   <td style={{ padding: "7px 8px", textAlign: "right", fontFamily: "var(--mono)" }}>{f2(it.sum?.tw || 0, 0)}</td>
                                   <td style={{ padding: "7px 8px", textAlign: "center" }}>
