@@ -86,7 +86,7 @@
     purchaseDate: new Date().toISOString().slice(0, 10),
     arrivalDate:  new Date().toISOString().slice(0, 10),
     licensePlate: "", grades: initG(), carCost: "", handling: "", notes: "",
-    releaseTime: "", departLocation: "",
+    releaseTime: "", departLocation: "", arrivalOrder: "",
   });
   const nowHM = () => {
     const d = new Date();
@@ -156,7 +156,7 @@
 
   function rowToEntry(row) {
     const rawGrades = row.grades || {};
-    const { __releaseTime, __departLocation, __unloadedAt, ...grades } = rawGrades;
+    const { __releaseTime, __departLocation, __unloadedAt, __arrivalOrder, ...grades } = rawGrades;
     const e = {
       id:             String(row.id),
       purchaseDate:   row.purchase_date || "",
@@ -166,6 +166,7 @@
       releaseTime:    __releaseTime || "",
       departLocation: __departLocation || "",
       unloadedAt:     __unloadedAt || "",
+      arrivalOrder:   (__arrivalOrder != null && __arrivalOrder !== "") ? String(__arrivalOrder) : "",
       carCost:      (row.car_cost  != null && row.car_cost  !== "") ? String(row.car_cost)  : "",
       handling:     (row.handling  != null && row.handling  !== "") ? String(row.handling)  : "",
       notes:        row.notes || "",
@@ -183,7 +184,7 @@
     car_cost:      parseFloat(e.carCost)  || 0,
     handling:      parseFloat(e.handling) || 0,
     notes:         e.notes || "",
-    grades:        { ...(e.grades || {}), __releaseTime: e.releaseTime || "", __departLocation: e.departLocation || "", __unloadedAt: e.unloadedAt || "" },
+    grades:        { ...(e.grades || {}), __releaseTime: e.releaseTime || "", __departLocation: e.departLocation || "", __unloadedAt: e.unloadedAt || "", __arrivalOrder: e.arrivalOrder || "" },
     created_at:    e.at || new Date().toISOString(),
     updated_at:    e.updatedAt || new Date().toISOString(),
   });
@@ -640,13 +641,23 @@ function App() {
     setEditForm({ purchaseDate: entry.purchaseDate, arrivalDate: entry.arrivalDate,
       licensePlate: entry.licensePlate, grades: JSON.parse(JSON.stringify(entry.grades || initG())),
       carCost: entry.carCost || "", handling: entry.handling || "", notes: entry.notes || "",
-      releaseTime: entry.releaseTime || "", departLocation: entry.departLocation || "" });
+      releaseTime: entry.releaseTime || "", departLocation: entry.departLocation || "",
+      arrivalOrder: entry.arrivalOrder || "" });
     setExp(null);
   }
 
   function setDeptLoc(entry, val, ev) {
     if (ev) ev.stopPropagation();
     const updated = { ...entry, departLocation: val || "", updatedAt: new Date().toISOString() };
+    setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
+    DB.upsert(updated);
+  }
+
+  // ตั้ง/แก้ลำดับการมาถึงโรงงานโดยตรงจากการ์ด (ไม่ต้องเข้าโหมดแก้ไข)
+  function setArrivalOrder(entry, val, ev) {
+    if (ev) ev.stopPropagation();
+    const clean = val === "" ? "" : String(Math.max(0, parseInt(val, 10) || 0));
+    const updated = { ...entry, arrivalOrder: clean, updatedAt: new Date().toISOString() };
     setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
     DB.upsert(updated);
   }
@@ -705,8 +716,8 @@ function App() {
   }
 
   function csv() {
-    const h = ["ทะเบียนรถ", "วันที่ซื้อ", "วันที่ถึงโรงงาน", "น้ำหนัก(กก)", "ราคาเฉลี่ย", "ค่ารถ", "ค่าดำเนินการ", "ต้นทุน/กก", "หมายเหตุ"];
-    const rows = filteredEntries.map(e => [e.licensePlate, e.purchaseDate, e.arrivalDate,
+    const h = ["ลำดับถึง", "ทะเบียนรถ", "วันที่ซื้อ", "วันที่ถึงโรงงาน", "น้ำหนัก(กก)", "ราคาเฉลี่ย", "ค่ารถ", "ค่าดำเนินการ", "ต้นทุน/กก", "หมายเหตุ"];
+    const rows = filteredEntries.map(e => [e.arrivalOrder || "", e.licensePlate, e.purchaseDate, e.arrivalDate,
       (e.sum?.tw || 0).toFixed(2), (e.sum?.avg || 0).toFixed(2), (e.sum?.car || 0).toFixed(2),
       (e.sum?.hand || 0).toFixed(2), (e.sum?.total || 0).toFixed(2), e.notes || ""]);
     navigator.clipboard.writeText([h, ...rows].map(r => r.join(",")).join("\n"));
@@ -719,14 +730,16 @@ function App() {
       "น้ำหนักรวม (กก.)", "ราคาเฉลี่ย (฿/กก.)", "ค่าวัตถุดิบ (฿)",
       "ค่ารถ (฿)", "ค่าดำเนินการ (฿/กก.)", "ค่าดำเนินการรวม (฿)",
       "ยอดที่ต้องจ่าย (฿)", "ต้นทุน/กก. (฿)", "หมายเหตุ",
-      ...GRADES.flatMap(g => [`${g.label} น้ำหนัก(กก)`, `${g.label} ราคา(฿/กก)`, `${g.label} มูลค่า(฿)`])
+      ...GRADES.flatMap(g => [`${g.label} น้ำหนัก(กก)`, `${g.label} ราคา(฿/กก)`, `${g.label} มูลค่า(฿)`]),
+      "ลำดับถึงโรงงาน"
     ];
     const rows = filteredEntries.map(e => [
       e.licensePlate, e.purchaseDate, e.arrivalDate,
       e.sum?.tw || 0, e.sum?.avg || 0, e.sum?.tv || 0,
       e.sum?.car || 0, e.sum?.hand || 0, e.sum?.handTotal || 0,
       e.sum?.totalPay || 0, e.sum?.total || 0, e.notes || "",
-      ...GRADES.flatMap(g => { const r = (e.sum?.rows || []).find(x => x.id === g.id); return [r?.weight || 0, r?.price || 0, r?.value || 0]; })
+      ...GRADES.flatMap(g => { const r = (e.sum?.rows || []).find(x => x.id === g.id); return [r?.weight || 0, r?.price || 0, r?.value || 0]; }),
+      e.arrivalOrder || ""
     ]);
     const ws = XLSX.utils.aoa_to_sheet([hd, ...rows]);
     ws["!cols"] = [
@@ -734,7 +747,8 @@ function App() {
       { wch: 16 }, { wch: 16 }, { wch: 16 },
       { wch: 12 }, { wch: 18 }, { wch: 18 },
       { wch: 20 }, { wch: 16 }, { wch: 18 },
-      ...GRADES.flatMap(() => [{ wch: 16 }, { wch: 14 }, { wch: 14 }])
+      ...GRADES.flatMap(() => [{ wch: 16 }, { wch: 14 }, { wch: 14 }]),
+      { wch: 16 }
     ];
     const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let C = range.s.c; C <= range.e.c; C++) {
@@ -789,6 +803,7 @@ function App() {
             const p = parseFloat(r[12 + i * 3 + 1]) || 0;
             grades[g.id] = { weight: w > 0 ? String(w) : "", price: p > 0 ? String(p) : "" };
           });
+          const orderCol = parseInt(r[12 + GRADES.length * 3], 10);
           const formObj = {
             purchaseDate: buyDate,
             arrivalDate:  String(r[2] || buyDate).trim(),
@@ -797,6 +812,7 @@ function App() {
             carCost:  String(parseFloat(r[6]) || ""),
             handling: String(parseFloat(r[7]) || ""),
             notes:    String(r[11] || ""),
+            arrivalOrder: orderCol > 0 ? String(orderCol) : "",
           };
           const entry = { id: newId(), ...formObj, sum: calc(formObj), at: new Date().toISOString(), importedFrom: file.name };
           addedEntries.push(entry);
@@ -826,6 +842,9 @@ function App() {
   const fA   = fW > 0 ? fV / fW : 0;
   const fPay = filteredEntries.reduce((a, e) => a + (e.sum?.totalPay || 0), 0);
   const isFiltered = filterFrom || filterTo;
+
+  // ลำดับรถถึงโรงงานถัดไป = ลำดับสูงสุดที่มีอยู่ + 1
+  const nextArrivalOrder = entries.reduce((mx, e) => Math.max(mx, parseInt(e.arrivalOrder, 10) || 0), 0) + 1;
 
   // ── Pagination: 50 รายการ (คัน) ต่อหน้า ──
   const PAGE_SIZE = 50;
@@ -984,6 +1003,18 @@ function App() {
                       padding: "0 11px", fontSize: 12, fontWeight: 600, fontFamily: "var(--font)", whiteSpace: "nowrap",
                       display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <i className="ti ti-clock-bolt" style={{ fontSize: 15 }} /> ตอนนี้
+                    </button>
+                  </div>
+                </div>
+                <div><label style={S.lbl}>ลำดับรถถึงโรงงาน</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input type="number" min="1" step="1" style={{ ...S.inp, flex: 1, textAlign: "left" }} placeholder="เช่น 1, 2, 3"
+                      value={form.arrivalOrder} onChange={e => sf("arrivalOrder", e.target.value)} />
+                    <button type="button" onClick={() => sf("arrivalOrder", String(nextArrivalOrder))} title={`เติมลำดับถัดไป (${nextArrivalOrder})`} style={{
+                      background: `${GOLD}1a`, border: `1px solid ${GOLD}80`, color: GOLD, borderRadius: 6,
+                      padding: "0 11px", fontSize: 12, fontWeight: 600, fontFamily: "var(--font)", whiteSpace: "nowrap",
+                      display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <i className="ti ti-arrow-badge-down" style={{ fontSize: 15 }} /> ถัดไป
                     </button>
                   </div>
                 </div>
@@ -1293,6 +1324,10 @@ function App() {
                                 </button>
                               </div>
                             </div>
+                            <div><label style={S.lbl}>ลำดับรถถึงโรงงาน</label>
+                              <input type="number" min="1" step="1" style={{ ...S.inp, textAlign: "left" }} placeholder="เช่น 1, 2, 3"
+                                value={editForm.arrivalOrder} onChange={e => sef("arrivalOrder", e.target.value)} />
+                            </div>
                             <div style={{ gridColumn: "1 / -1" }}><label style={S.lbl}>จุดปล่อยรถ</label>
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 {LOCATIONS.map(loc => {
@@ -1389,6 +1424,23 @@ function App() {
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                            {/* ลำดับรถถึงโรงงาน */}
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0, alignSelf: "center" }} onClick={ev => ev.stopPropagation()}>
+                              <span style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>ลำดับถึง</span>
+                              {entry.arrivalOrder ? (
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#0D1B2E", border: `2px solid ${GOLD}`, color: GOLD, fontFamily: "var(--mono)", fontWeight: 700, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.arrivalOrder}</span>
+                                  <button onClick={ev => setArrivalOrder(entry, "", ev)} title="ล้างลำดับ" style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12, padding: 2, lineHeight: 1 }}>
+                                    <i className="ti ti-x" />
+                                  </button>
+                                </span>
+                              ) : (
+                                <input type="number" min="1" step="1" placeholder="#"
+                                  onClick={ev => ev.stopPropagation()}
+                                  onChange={ev => { if (ev.target.value) setArrivalOrder(entry, ev.target.value); }}
+                                  style={{ width: 52, textAlign: "center", padding: "5px 4px", fontSize: 13 }} />
+                              )}
+                            </div>
                             <div style={{ background: `${GOLD}18`, border: `1px solid ${GOLD}60`, borderRadius: 7, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: GOLD, fontFamily: "var(--mono)", minWidth: 100, textAlign: "center", flexShrink: 0, alignSelf: "center" }}>
                               {entry.licensePlate || "—"}
                             </div>
