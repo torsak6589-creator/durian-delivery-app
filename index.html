@@ -897,6 +897,12 @@ function App() {
   const uPend  = uTotal - uDone;
   const uwDone = filteredEntries.filter(e => e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
   const uwPend = filteredEntries.filter(e => !e.unloadedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
+  // ชุบน้ำยา — คิดจากยอดที่ลงรับแล้ว (unloaded) เท่านั้น
+  const dipBase   = filteredEntries.filter(e => e.unloadedAt);
+  const dipDoneN  = dipBase.filter(e => e.dippedAt).length;
+  const dipPendN  = dipBase.length - dipDoneN;
+  const wDipDone  = dipBase.filter(e => e.dippedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
+  const wDipPend  = dipBase.filter(e => !e.dippedAt).reduce((a, e) => a + (e.sum?.tw || 0), 0);
 
   // ── Render guards ──
   if (authLoading) {
@@ -1700,6 +1706,8 @@ function App() {
                 { lb: "ยังไม่ลง", v: uPend + " คัน", ic: "ti-clock-hour-4", c: "#e0a23b" },
                 { lb: "น้ำหนักลงแล้ว", v: f2(uwDone, 0) + " กก.", ic: "ti-weight", c: "#2d9e52" },
                 { lb: "คงเหลือยังไม่ลง", v: f2(uwPend, 0) + " กก.", ic: "ti-weight", c: "#e0a23b" },
+                { lb: `ชุบน้ำยาแล้ว (${dipDoneN} คัน)`, v: f2(wDipDone, 0) + " กก.", ic: "ti-droplet-filled", c: "#0891b2" },
+                { lb: `ยังไม่ชุบ (${dipPendN} คัน)`, v: f2(wDipPend, 0) + " กก.", ic: "ti-droplet", c: "#e0a23b" },
               ].map(c => (
                 <div key={c.lb} style={{ background: "var(--card2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                   <i className={`ti ${c.ic}`} style={{ fontSize: 18, color: c.c }} />
