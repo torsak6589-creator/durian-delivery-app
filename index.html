@@ -156,7 +156,7 @@
 
   function rowToEntry(row) {
     const rawGrades = row.grades || {};
-    const { __releaseTime, __departLocation, __unloadedAt, __arrivalOrder, ...grades } = rawGrades;
+    const { __releaseTime, __departLocation, __unloadedAt, __arrivalOrder, __dippedAt, ...grades } = rawGrades;
     const e = {
       id:             String(row.id),
       purchaseDate:   row.purchase_date || "",
@@ -166,6 +166,7 @@
       releaseTime:    __releaseTime || "",
       departLocation: __departLocation || "",
       unloadedAt:     __unloadedAt || "",
+      dippedAt:       __dippedAt || "",
       arrivalOrder:   (__arrivalOrder != null && __arrivalOrder !== "") ? String(__arrivalOrder) : "",
       carCost:      (row.car_cost  != null && row.car_cost  !== "") ? String(row.car_cost)  : "",
       handling:     (row.handling  != null && row.handling  !== "") ? String(row.handling)  : "",
@@ -184,7 +185,7 @@
     car_cost:      parseFloat(e.carCost)  || 0,
     handling:      parseFloat(e.handling) || 0,
     notes:         e.notes || "",
-    grades:        { ...(e.grades || {}), __releaseTime: e.releaseTime || "", __departLocation: e.departLocation || "", __unloadedAt: e.unloadedAt || "", __arrivalOrder: e.arrivalOrder || "" },
+    grades:        { ...(e.grades || {}), __releaseTime: e.releaseTime || "", __departLocation: e.departLocation || "", __unloadedAt: e.unloadedAt || "", __arrivalOrder: e.arrivalOrder || "", __dippedAt: e.dippedAt || "" },
     created_at:    e.at || new Date().toISOString(),
     updated_at:    e.updatedAt || new Date().toISOString(),
   });
@@ -692,6 +693,15 @@ function App() {
     DB.upsert(updated);
     if (val) flash2("ok", `บันทึก: รถ ${entry.licensePlate || ""} ลงเสร็จแล้ว ✓`);
     else flash2("ok", "ยกเลิกสถานะ — กลับเป็น 'ยังไม่ลง'");
+  }
+
+  function setDipped(entry, val, ev) {
+    if (ev) ev.stopPropagation();
+    const updated = { ...entry, dippedAt: val || "", updatedAt: new Date().toISOString() };
+    setEntries(prev => prev.map(e => e.id === entry.id ? updated : e));
+    DB.upsert(updated);
+    if (val) flash2("ok", `บันทึก: รถ ${entry.licensePlate || ""} ชุบน้ำยาแล้ว ✓`);
+    else flash2("ok", "ยกเลิกสถานะ — กลับเป็น 'รอชุบ'");
   }
 
   function save() {
@@ -1750,7 +1760,7 @@ function App() {
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
                               <tr style={{ borderBottom: `1px solid ${GOLD}30` }}>
-                                {["ลำดับ", "ทะเบียนรถ", "น้ำหนัก (กก.)", "สถานะ", "จัดการ"].map((h, i) => (
+                                {["ลำดับ", "ทะเบียนรถ", "น้ำหนัก (กก.)", "สถานะ", "จัดการ", "ชุบน้ำยา"].map((h, i) => (
                                   <th key={h} style={{ padding: "6px 8px", textAlign: i === 0 ? "center" : i === 1 ? "left" : i === 2 ? "right" : "center", color: GOLD, fontWeight: 600, fontSize: 10, textTransform: "uppercase" }}>{h}</th>
                                 ))}
                               </tr>
@@ -1778,6 +1788,17 @@ function App() {
                                     ) : (
                                       <button onClick={() => setUnloaded(it, new Date().toISOString())} style={{ background: "#f59e0b", border: "1px solid #f59e0b", color: "#0D1B2E", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                                         <i className="ti ti-clock-hour-4" style={{ fontSize: 13 }} /> รอลง
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: "7px 8px", textAlign: "center" }}>
+                                    {it.dippedAt ? (
+                                      <button onClick={() => setDipped(it, "")} title={`ชุบน้ำยาแล้วเมื่อ ${fdt(it.dippedAt)} — กดเพื่อยกเลิก`} style={{ background: "#0891b2", border: "1px solid #0891b2", color: "#e0fbff", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                                        <i className="ti ti-droplet-filled" style={{ fontSize: 13 }} /> ชุบแล้ว {fht(it.dippedAt)}
+                                      </button>
+                                    ) : (
+                                      <button onClick={() => setDipped(it, new Date().toISOString())} title="สถานะ: รอชุบน้ำยา — กดเมื่อชุบเสร็จแล้ว" style={{ background: "none", border: "1.5px solid #0891b2", color: "#0891b2", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                                        <i className="ti ti-droplet" style={{ fontSize: 13 }} /> รอชุบ
                                       </button>
                                     )}
                                   </td>
